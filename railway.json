@@ -1,7 +1,7 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "deploy": {
-    "startCommand": "pnpm start",
+    "startCommand": "pnpm start -p ${PORT:-3000}",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
