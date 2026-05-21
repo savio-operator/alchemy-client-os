@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import { drizzle, BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 import path from "path";
 import fs from "fs";
@@ -7,166 +7,199 @@ import fs from "fs";
 const DB_DIR = path.join(process.cwd(), "data");
 const DB_PATH = path.join(DB_DIR, "adchemy.db");
 
-// Ensure data directory exists
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
+let _sqlite: Database.Database | null = null;
+let _db: BetterSQLite3Database<typeof schema> | null = null;
+let _initialized = false;
+
+function getSqlite(): Database.Database {
+  if (!_sqlite) {
+    if (!fs.existsSync(DB_DIR)) {
+      fs.mkdirSync(DB_DIR, { recursive: true });
+    }
+    _sqlite = new Database(DB_PATH);
+    _sqlite.pragma("journal_mode = WAL");
+    _sqlite.pragma("foreign_keys = ON");
+  }
+  return _sqlite;
 }
 
-const sqlite = new Database(DB_PATH);
-sqlite.pragma("journal_mode = WAL");
-sqlite.pragma("foreign_keys = ON");
+function initTables(sqlite: Database.Database) {
+  if (_initialized) return;
+  _initialized = true;
 
-export const db = drizzle(sqlite, { schema });
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS clients (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      industry TEXT,
+      stage TEXT,
+      created_at TEXT NOT NULL,
+      archived_at TEXT
+    );
 
-// Initialize tables
-sqlite.exec(`
-  CREATE TABLE IF NOT EXISTS clients (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    slug TEXT NOT NULL UNIQUE,
-    industry TEXT,
-    stage TEXT,
-    created_at TEXT NOT NULL,
-    archived_at TEXT
-  );
+    CREATE TABLE IF NOT EXISTS client_profile (
+      client_id TEXT PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
+      raw_json TEXT
+    );
 
-  CREATE TABLE IF NOT EXISTS client_profile (
-    client_id TEXT PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
-    raw_json TEXT
-  );
+    CREATE TABLE IF NOT EXISTS client_brief (
+      client_id TEXT PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
+      summary_md TEXT,
+      north_star TEXT,
+      audience TEXT,
+      voice TEXT,
+      constraints TEXT
+    );
 
-  CREATE TABLE IF NOT EXISTS client_brief (
-    client_id TEXT PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
-    summary_md TEXT,
-    north_star TEXT,
-    audience TEXT,
-    voice TEXT,
-    constraints TEXT
-  );
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
 
-  CREATE TABLE IF NOT EXISTS sessions (
-    id TEXT PRIMARY KEY,
-    expires_at TEXT NOT NULL,
-    created_at TEXT NOT NULL
-  );
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
 
-  CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-  );
+    CREATE TABLE IF NOT EXISTS history_entries (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      title TEXT,
+      body TEXT,
+      attachments TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
 
-  -- Phase 2 tables
+    CREATE TABLE IF NOT EXISTS ideas (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      body TEXT,
+      "column" TEXT NOT NULL DEFAULT 'raw',
+      tags TEXT,
+      is_online INTEGER DEFAULT 1,
+      estimated_cost REAL,
+      refined_body TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
 
-  CREATE TABLE IF NOT EXISTS history_entries (
-    id TEXT PRIMARY KEY,
-    client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-    type TEXT NOT NULL,
-    title TEXT,
-    body TEXT,
-    attachments TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
+    CREATE TABLE IF NOT EXISTS campaigns (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      objective TEXT,
+      channel TEXT,
+      hypothesis TEXT,
+      creative_notes TEXT,
+      budget REAL,
+      start_date TEXT,
+      end_date TEXT,
+      kpi TEXT,
+      outcome TEXT,
+      status TEXT NOT NULL DEFAULT 'planned',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
 
-  CREATE TABLE IF NOT EXISTS ideas (
-    id TEXT PRIMARY KEY,
-    client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-    title TEXT NOT NULL,
-    body TEXT,
-    "column" TEXT NOT NULL DEFAULT 'raw',
-    tags TEXT,
-    is_online INTEGER DEFAULT 1,
-    estimated_cost REAL,
-    refined_body TEXT,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
+    CREATE TABLE IF NOT EXISTS social_posts (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      platform TEXT NOT NULL,
+      copy TEXT,
+      media_urls TEXT,
+      scheduled_for TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
 
-  CREATE TABLE IF NOT EXISTS campaigns (
-    id TEXT PRIMARY KEY,
-    client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-    type TEXT NOT NULL,
-    objective TEXT,
-    channel TEXT,
-    hypothesis TEXT,
-    creative_notes TEXT,
-    budget REAL,
-    start_date TEXT,
-    end_date TEXT,
-    kpi TEXT,
-    outcome TEXT,
-    status TEXT NOT NULL DEFAULT 'planned',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
+    CREATE TABLE IF NOT EXISTS discoveries (
+      id TEXT PRIMARY KEY,
+      source_name TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      external_id TEXT NOT NULL,
+      author TEXT,
+      title TEXT,
+      body TEXT,
+      media_urls TEXT,
+      external_url TEXT,
+      raw_json TEXT,
+      fetched_at TEXT NOT NULL,
+      popularity_score REAL
+    );
 
-  CREATE TABLE IF NOT EXISTS social_posts (
-    id TEXT PRIMARY KEY,
-    client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-    platform TEXT NOT NULL,
-    copy TEXT,
-    media_urls TEXT,
-    scheduled_for TEXT,
-    status TEXT NOT NULL DEFAULT 'draft',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_discoveries_dedup
+      ON discoveries(source_name, external_id);
 
-  CREATE TABLE IF NOT EXISTS discoveries (
-    id TEXT PRIMARY KEY,
-    source_name TEXT NOT NULL,
-    source_type TEXT NOT NULL,
-    external_id TEXT NOT NULL,
-    author TEXT,
-    title TEXT,
-    body TEXT,
-    media_urls TEXT,
-    external_url TEXT,
-    raw_json TEXT,
-    fetched_at TEXT NOT NULL,
-    popularity_score REAL
-  );
+    CREATE TABLE IF NOT EXISTS client_discoveries (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      discovery_id TEXT NOT NULL REFERENCES discoveries(id) ON DELETE CASCADE,
+      score REAL NOT NULL,
+      tags TEXT,
+      why_md TEXT,
+      surfaced_at TEXT,
+      dismissed_at TEXT,
+      saved_at TEXT
+    );
 
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_discoveries_dedup
-    ON discoveries(source_name, external_id);
+    CREATE TABLE IF NOT EXISTS agent_runs (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      agent_name TEXT NOT NULL,
+      input_json TEXT,
+      output_md TEXT,
+      created_at TEXT NOT NULL
+    );
 
-  CREATE TABLE IF NOT EXISTS client_discoveries (
-    id TEXT PRIMARY KEY,
-    client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-    discovery_id TEXT NOT NULL REFERENCES discoveries(id) ON DELETE CASCADE,
-    score REAL NOT NULL,
-    tags TEXT,
-    why_md TEXT,
-    surfaced_at TEXT,
-    dismissed_at TEXT,
-    saved_at TEXT
-  );
+    CREATE TABLE IF NOT EXISTS predictions (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      forecast_md TEXT,
+      created_at TEXT NOT NULL
+    );
 
-  CREATE TABLE IF NOT EXISTS agent_runs (
-    id TEXT PRIMARY KEY,
-    client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-    agent_name TEXT NOT NULL,
-    input_json TEXT,
-    output_md TEXT,
-    created_at TEXT NOT NULL
-  );
+    CREATE VIRTUAL TABLE IF NOT EXISTS history_fts USING fts5(
+      title,
+      body,
+      content='history_entries',
+      content_rowid='rowid'
+    );
+  `);
+}
 
-  CREATE TABLE IF NOT EXISTS predictions (
-    id TEXT PRIMARY KEY,
-    client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-    forecast_md TEXT,
-    created_at TEXT NOT NULL
-  );
+export const sqlite = new Proxy({} as Database.Database, {
+  get(_target, prop) {
+    const instance = getSqlite();
+    initTables(instance);
+    const value = (instance as unknown as Record<string | symbol, unknown>)[prop];
+    if (typeof value === "function") {
+      return value.bind(instance);
+    }
+    return value;
+  },
+});
 
-  -- FTS5 for history full-text search
-  CREATE VIRTUAL TABLE IF NOT EXISTS history_fts USING fts5(
-    title,
-    body,
-    content='history_entries',
-    content_rowid='rowid'
-  );
-`);
+export const db = new Proxy({} as BetterSQLite3Database<typeof schema>, {
+  get(_target, prop) {
+    if (!_db) {
+      const instance = getSqlite();
+      initTables(instance);
+      _db = drizzle(instance, { schema });
+    }
+    const value = (_db as unknown as Record<string | symbol, unknown>)[prop];
+    if (typeof value === "function") {
+      return value.bind(_db);
+    }
+    return value;
+  },
+});
 
 // Helper to sync FTS index
 export function indexHistoryEntry(id: string, title: string | null, body: string | null) {
@@ -195,5 +228,3 @@ export function searchHistory(query: string, clientId: string) {
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
-
-export { sqlite };
