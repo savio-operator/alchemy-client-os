@@ -1,0 +1,174 @@
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+
+// --- Phase 1 tables ---
+
+export const clients = sqliteTable("clients", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  industry: text("industry"),
+  stage: text("stage"),
+  createdAt: text("created_at").notNull(),
+  archivedAt: text("archived_at"),
+});
+
+export const clientProfile = sqliteTable("client_profile", {
+  clientId: text("client_id")
+    .primaryKey()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  rawJson: text("raw_json"),
+});
+
+export const clientBrief = sqliteTable("client_brief", {
+  clientId: text("client_id")
+    .primaryKey()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  summaryMd: text("summary_md"),
+  northStar: text("north_star"),
+  audience: text("audience"),
+  voice: text("voice"),
+  constraints: text("constraints"),
+});
+
+export const sessions = sqliteTable("sessions", {
+  id: text("id").primaryKey(),
+  expiresAt: text("expires_at").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});
+
+// --- Phase 2 tables ---
+
+export const historyEntries = sqliteTable("history_entries", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // Note, Meeting, Win, Loss, Decision
+  title: text("title"),
+  body: text("body"), // tiptap JSON or HTML
+  attachments: text("attachments"), // JSON array of file paths
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const ideas = sqliteTable("ideas", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  body: text("body"), // tiptap JSON
+  column: text("column").notNull().default("raw"), // raw, cooking, ready
+  tags: text("tags"), // JSON array
+  isOnline: integer("is_online", { mode: "boolean" }).default(true),
+  estimatedCost: real("estimated_cost"),
+  refinedBody: text("refined_body"), // agent-refined version
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const campaigns = sqliteTable("campaigns", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // online, offline
+  objective: text("objective"),
+  channel: text("channel"),
+  hypothesis: text("hypothesis"),
+  creativeNotes: text("creative_notes"),
+  budget: real("budget"),
+  startDate: text("start_date"),
+  endDate: text("end_date"),
+  kpi: text("kpi"),
+  outcome: text("outcome"),
+  status: text("status").notNull().default("planned"), // planned, active, done
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const socialPosts = sqliteTable("social_posts", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  platform: text("platform").notNull(),
+  copy: text("copy"),
+  mediaUrls: text("media_urls"), // JSON array
+  scheduledFor: text("scheduled_for"),
+  status: text("status").notNull().default("draft"), // draft, queued, posted
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const discoveries = sqliteTable("discoveries", {
+  id: text("id").primaryKey(),
+  sourceName: text("source_name").notNull(),
+  sourceType: text("source_type").notNull(),
+  externalId: text("external_id").notNull(),
+  author: text("author"),
+  title: text("title"),
+  body: text("body"),
+  mediaUrls: text("media_urls"), // JSON array
+  externalUrl: text("external_url"),
+  rawJson: text("raw_json"),
+  fetchedAt: text("fetched_at").notNull(),
+  popularityScore: real("popularity_score"),
+});
+
+export const clientDiscoveries = sqliteTable("client_discoveries", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  discoveryId: text("discovery_id")
+    .notNull()
+    .references(() => discoveries.id, { onDelete: "cascade" }),
+  score: real("score").notNull(),
+  tags: text("tags"), // JSON array
+  whyMd: text("why_md"),
+  surfacedAt: text("surfaced_at"),
+  dismissedAt: text("dismissed_at"),
+  savedAt: text("saved_at"),
+});
+
+export const agentRuns = sqliteTable("agent_runs", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  agentName: text("agent_name").notNull(),
+  inputJson: text("input_json"),
+  outputMd: text("output_md"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const predictions = sqliteTable("predictions", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  forecastMd: text("forecast_md"),
+  createdAt: text("created_at").notNull(),
+});
+
+// --- Types ---
+
+export type Client = typeof clients.$inferSelect;
+export type NewClient = typeof clients.$inferInsert;
+export type ClientProfile = typeof clientProfile.$inferSelect;
+export type ClientBrief = typeof clientBrief.$inferSelect;
+export type HistoryEntry = typeof historyEntries.$inferSelect;
+export type Idea = typeof ideas.$inferSelect;
+export type Campaign = typeof campaigns.$inferSelect;
+export type SocialPost = typeof socialPosts.$inferSelect;
+export type Discovery = typeof discoveries.$inferSelect;
+export type ClientDiscovery = typeof clientDiscoveries.$inferSelect;
+export type AgentRun = typeof agentRuns.$inferSelect;
+export type Prediction = typeof predictions.$inferSelect;

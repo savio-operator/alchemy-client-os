@@ -2,7 +2,18 @@
   "permissions": {
     "allow": [
       "Bash(pnpm dlx:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm approve-builds:*)",
+      "Bash(python3 -c \" import json, sys pkg = json.load\\(sys.stdin\\) pkg['pnpm'] = pkg.get\\('pnpm', {}\\) pkg['pnpm']['onlyBuiltDependencies'] = ['argon2', 'better-sqlite3'] json.dump\\(pkg, sys.stdout, indent=2\\) \")",
+      "Bash(mv package.json.tmp package.json)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm build:*)",
+      "Bash(ls src/lib/integrations/google*)",
+      "Bash(gh auth:*)",
+      "Bash(git config:*)",
+      "Bash(git add:*)"
     ]
   }
 }
