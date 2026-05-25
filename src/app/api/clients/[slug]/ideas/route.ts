@@ -9,10 +9,10 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const client = db.select().from(clients).where(eq(clients.slug, slug)).get();
+  const client = await db.select().from(clients).where(eq(clients.slug, slug)).get();
   if (!client) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const allIdeas = db
+  const allIdeas = await db
     .select()
     .from(ideas)
     .where(eq(ideas.clientId, client.id))
@@ -27,7 +27,7 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const client = db.select().from(clients).where(eq(clients.slug, slug)).get();
+  const client = await db.select().from(clients).where(eq(clients.slug, slug)).get();
   if (!client) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await request.json();
@@ -35,14 +35,14 @@ export async function POST(
   const now = new Date().toISOString();
 
   // Get max sort order for the target column
-  const maxOrder = db
+  const allClientIdeas = await db
     .select()
     .from(ideas)
     .where(eq(ideas.clientId, client.id))
-    .all()
-    .reduce((max, i) => Math.max(max, i.sortOrder), -1);
+    .all();
+  const maxOrder = allClientIdeas.reduce((max, i) => Math.max(max, i.sortOrder), -1);
 
-  db.insert(ideas)
+  await db.insert(ideas)
     .values({
       id,
       clientId: client.id,
@@ -58,6 +58,6 @@ export async function POST(
     })
     .run();
 
-  const created = db.select().from(ideas).where(eq(ideas.id, id)).get();
+  const created = await db.select().from(ideas).where(eq(ideas.id, id)).get();
   return NextResponse.json(created, { status: 201 });
 }

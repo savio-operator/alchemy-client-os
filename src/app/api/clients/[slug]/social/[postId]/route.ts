@@ -17,7 +17,7 @@ export async function PATCH(
   if (body.status !== undefined) updateData.status = body.status;
   if (body.mediaUrls !== undefined) updateData.mediaUrls = JSON.stringify(body.mediaUrls);
 
-  db.update(socialPosts).set(updateData).where(eq(socialPosts.id, postId)).run();
+  await db.update(socialPosts).set(updateData).where(eq(socialPosts.id, postId)).run();
   return NextResponse.json({ success: true });
 }
 
@@ -26,6 +26,6 @@ export async function DELETE(
   { params }: { params: Promise<{ slug: string; postId: string }> }
 ) {
   const { postId } = await params;
-  db.delete(socialPosts).where(eq(socialPosts.id, postId)).run();
+  await db.delete(socialPosts).where(eq(socialPosts.id, postId)).run();
   return NextResponse.json({ success: true });
 }

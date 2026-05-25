@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import RSSParser from "rss-parser";
-import { db, sqlite } from "@/db";
+import { db, queryOne, queryAll } from "@/db";
 import {
   clients,
   clientBrief,
@@ -11,11 +11,8 @@ import { eq } from "drizzle-orm";
 import { loadSources, type SourceConfig } from "@/lib/sources";
 import { callAI } from "@/lib/anthropic";
 import crypto from "crypto";
-import fs from "fs";
-import path from "path";
 
 const rssParser = new RSSParser();
-const USER_AGENT = "AdchemyClientOS/1.0 (single-user research tool)";
 
 // Track last poll times
 const lastPolled = new Map<string, number>();
@@ -29,11 +26,6 @@ export function startDiscoveryEngine() {
   // Poll every 10 minutes, check which sources are due
   cron.schedule("*/10 * * * *", async () => {
     await runPollingCycle();
-  });
-
-  // Database backup daily at 2am
-  cron.schedule("0 2 * * *", () => {
-    backupDatabase();
   });
 
   // Run initial poll after a short delay
@@ -90,11 +82,11 @@ async function fetchRSS(source: SourceConfig) {
     if (!externalId) continue;
 
     // Check for duplicate
-    const existing = sqlite
-      .prepare(
-        "SELECT id FROM discoveries WHERE source_name = ? AND external_id = ?"
-      )
-      .get(source.name, externalId);
+    const existing = await queryOne(
+      "SELECT id FROM discoveries WHERE source_name = ? AND external_id = ?",
+      source.name,
+      externalId
+    );
 
     if (existing) continue;
 
@@ -122,7 +114,7 @@ async function fetchRSS(source: SourceConfig) {
     }
 
     const id = crypto.randomUUID();
-    db.insert(discoveries)
+    await db.insert(discoveries)
       .values({
         id,
         sourceName: source.name,
@@ -138,20 +130,19 @@ async function fetchRSS(source: SourceConfig) {
         rawJson: JSON.stringify(item),
         fetchedAt: new Date().toISOString(),
         popularityScore: null,
-      })
-      .run();
+      });
   }
 }
 
-async function scoreNewDiscoveries() {
+export async function scoreNewDiscoveries() {
   // Get all unscored discoveries (not yet in client_discoveries for any client)
-  const allClients = db.select().from(clients).all();
+  const allClients = await db.select().from(clients);
   if (allClients.length === 0) return;
 
   for (const client of allClients) {
     if (client.archivedAt) continue;
 
-    const brief = db
+    const brief = await db
       .select()
       .from(clientBrief)
       .where(eq(clientBrief.clientId, client.id))
@@ -160,23 +151,22 @@ async function scoreNewDiscoveries() {
     if (!brief?.summaryMd) continue;
 
     // Get discoveries not yet scored for this client
-    const unscored = sqlite
-      .prepare(
-        `SELECT d.* FROM discoveries d
-         WHERE d.id NOT IN (
-           SELECT discovery_id FROM client_discoveries WHERE client_id = ?
-         )
-         ORDER BY d.fetched_at DESC
-         LIMIT 20`
-      )
-      .all(client.id) as Array<{
-        id: string;
-        title: string | null;
-        body: string | null;
-        source_name: string;
-        source_type: string;
-        external_url: string | null;
-      }>;
+    const unscored = await queryAll<{
+      id: string;
+      title: string | null;
+      body: string | null;
+      source_name: string;
+      source_type: string;
+      external_url: string | null;
+    }>(
+      `SELECT d.* FROM discoveries d
+       WHERE d.id NOT IN (
+         SELECT discovery_id FROM client_discoveries WHERE client_id = ?
+       )
+       ORDER BY d.fetched_at DESC
+       LIMIT 20`,
+      client.id
+    );
 
     if (unscored.length === 0) continue;
 
@@ -228,7 +218,7 @@ Return ONLY the JSON array, no markdown.`,
         if (!discovery) continue;
 
         const cdId = crypto.randomUUID();
-        db.insert(clientDiscoveries)
+        await db.insert(clientDiscoveries)
           .values({
             id: cdId,
             clientId: client.id,
@@ -237,30 +227,13 @@ Return ONLY the JSON array, no markdown.`,
             tags: JSON.stringify(score.tags || []),
             whyMd: score.why || null,
             surfacedAt:
-              score.score >= 7 ? null : new Date().toISOString(), // Only unsurfaced if high-scoring
-          })
-          .run();
+              score.score >= 7 ? null : new Date().toISOString(),
+          });
       }
     } catch {
       // AI scoring failed — skip this batch
     }
   }
-}
-
-function backupDatabase() {
-  const srcPath = path.join(process.cwd(), "data", "adchemy.db");
-  const backupDir = path.join(process.cwd(), "data", "backups");
-
-  if (!fs.existsSync(srcPath)) return;
-  if (!fs.existsSync(backupDir)) {
-    fs.mkdirSync(backupDir, { recursive: true });
-  }
-
-  const date = new Date().toISOString().split("T")[0];
-  const destPath = path.join(backupDir, `${date}.db`);
-
-  // Use SQLite backup API via better-sqlite3
-  sqlite.backup(destPath);
 }
 
 function stripHtml(html: string): string {

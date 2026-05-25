@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
-import { db, sqlite } from "@/db";
+import { db, queryAll } from "@/db";
 import { clients, clientBrief, clientDiscoveries } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { callAI } from "@/lib/anthropic";
 import crypto from "crypto";
 
 export async function POST() {
-  const allClients = db.select().from(clients).all();
+  const allClients = await db.select().from(clients);
   let scored = 0;
 
   for (const client of allClients) {
     if (client.archivedAt) continue;
 
-    const brief = db
+    const brief = await db
       .select()
       .from(clientBrief)
       .where(eq(clientBrief.clientId, client.id))
@@ -20,22 +20,21 @@ export async function POST() {
 
     if (!brief?.summaryMd) continue;
 
-    const unscored = sqlite
-      .prepare(
-        `SELECT d.* FROM discoveries d
-         WHERE d.id NOT IN (
-           SELECT discovery_id FROM client_discoveries WHERE client_id = ?
-         )
-         ORDER BY d.fetched_at DESC
-         LIMIT 20`
-      )
-      .all(client.id) as Array<{
-        id: string;
-        title: string | null;
-        body: string | null;
-        source_name: string;
-        source_type: string;
-      }>;
+    const unscored = await queryAll<{
+      id: string;
+      title: string | null;
+      body: string | null;
+      source_name: string;
+      source_type: string;
+    }>(
+      `SELECT d.* FROM discoveries d
+       WHERE d.id NOT IN (
+         SELECT discovery_id FROM client_discoveries WHERE client_id = ?
+       )
+       ORDER BY d.fetched_at DESC
+       LIMIT 20`,
+      client.id
+    );
 
     if (unscored.length === 0) continue;
 
@@ -66,7 +65,7 @@ Return a JSON array only. Be strict — most items score 3-5.`,
         const discovery = unscored[score.index];
         if (!discovery) continue;
 
-        db.insert(clientDiscoveries)
+        await db.insert(clientDiscoveries)
           .values({
             id: crypto.randomUUID(),
             clientId: client.id,
@@ -75,8 +74,7 @@ Return a JSON array only. Be strict — most items score 3-5.`,
             tags: JSON.stringify(score.tags || []),
             whyMd: score.why || null,
             surfacedAt: score.score >= 7 ? null : new Date().toISOString(),
-          })
-          .run();
+          });
         scored++;
       }
     } catch {

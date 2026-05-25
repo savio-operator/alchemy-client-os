@@ -21,7 +21,7 @@ export async function PATCH(
   if (body.sortOrder !== undefined) updateData.sortOrder = body.sortOrder;
   if (body.refinedBody !== undefined) updateData.refinedBody = body.refinedBody;
 
-  db.update(ideas).set(updateData).where(eq(ideas.id, ideaId)).run();
+  await db.update(ideas).set(updateData).where(eq(ideas.id, ideaId)).run();
   return NextResponse.json({ success: true });
 }
 
@@ -30,6 +30,6 @@ export async function DELETE(
   { params }: { params: Promise<{ slug: string; ideaId: string }> }
 ) {
   const { ideaId } = await params;
-  db.delete(ideas).where(eq(ideas.id, ideaId)).run();
+  await db.delete(ideas).where(eq(ideas.id, ideaId)).run();
   return NextResponse.json({ success: true });
 }

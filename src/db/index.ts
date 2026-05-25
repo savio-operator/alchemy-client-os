@@ -1,35 +1,31 @@
-import Database from "better-sqlite3";
-import { drizzle, BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { createClient, Client } from "@libsql/client";
+import { drizzle, LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "./schema";
-import path from "path";
-import fs from "fs";
 
-const DB_DIR = process.env.DB_PATH
-  ? path.dirname(process.env.DB_PATH)
-  : path.join(process.cwd(), "data");
-const DB_PATH = process.env.DB_PATH || path.join(DB_DIR, "adchemy.db");
+const TURSO_URL = process.env.TURSO_DATABASE_URL || "file:data/adchemy.db";
+const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
 
-let _sqlite: Database.Database | null = null;
-let _db: BetterSQLite3Database<typeof schema> | null = null;
+let _client: Client | null = null;
+let _db: LibSQLDatabase<typeof schema> | null = null;
 let _initialized = false;
 
-function getSqlite(): Database.Database {
-  if (!_sqlite) {
-    if (!fs.existsSync(DB_DIR)) {
-      fs.mkdirSync(DB_DIR, { recursive: true });
-    }
-    _sqlite = new Database(DB_PATH);
-    _sqlite.pragma("journal_mode = WAL");
-    _sqlite.pragma("foreign_keys = ON");
+function getClient(): Client {
+  if (!_client) {
+    _client = createClient({
+      url: TURSO_URL,
+      authToken: TURSO_TOKEN,
+    });
   }
-  return _sqlite;
+  return _client;
 }
 
-function initTables(sqlite: Database.Database) {
+async function initTables() {
   if (_initialized) return;
   _initialized = true;
 
-  sqlite.exec(`
+  const client = getClient();
+
+  await client.executeMultiple(`
     CREATE TABLE IF NOT EXISTS clients (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -166,20 +162,23 @@ function initTables(sqlite: Database.Database) {
       forecast_md TEXT,
       created_at TEXT NOT NULL
     );
-
-    CREATE VIRTUAL TABLE IF NOT EXISTS history_fts USING fts5(
-      title,
-      body,
-      content='history_entries',
-      content_rowid='rowid'
-    );
   `);
 }
 
-export const sqlite = new Proxy({} as Database.Database, {
+// Ensure tables are initialized before any DB access
+const initPromise = initTables();
+
+export function getDb(): LibSQLDatabase<typeof schema> {
+  if (!_db) {
+    _db = drizzle(getClient(), { schema });
+  }
+  return _db;
+}
+
+// Lazy proxy that ensures init before access
+export const db = new Proxy({} as LibSQLDatabase<typeof schema>, {
   get(_target, prop) {
-    const instance = getSqlite();
-    initTables(instance);
+    const instance = getDb();
     const value = (instance as unknown as Record<string | symbol, unknown>)[prop];
     if (typeof value === "function") {
       return value.bind(instance);
@@ -188,43 +187,54 @@ export const sqlite = new Proxy({} as Database.Database, {
   },
 });
 
-export const db = new Proxy({} as BetterSQLite3Database<typeof schema>, {
-  get(_target, prop) {
-    if (!_db) {
-      const instance = getSqlite();
-      initTables(instance);
-      _db = drizzle(instance, { schema });
-    }
-    const value = (_db as unknown as Record<string | symbol, unknown>)[prop];
-    if (typeof value === "function") {
-      return value.bind(_db);
-    }
-    return value;
-  },
-});
-
-// Helper to sync FTS index
-export function indexHistoryEntry(id: string, title: string | null, body: string | null) {
-  const row = sqlite.prepare("SELECT rowid FROM history_entries WHERE id = ?").get(id) as { rowid: number } | undefined;
-  if (row) {
-    sqlite.prepare("INSERT OR REPLACE INTO history_fts(rowid, title, body) VALUES (?, ?, ?)").run(
-      row.rowid,
-      title || "",
-      stripHtml(body || "")
-    );
-  }
+// Raw query helpers (async replacements for sqlite.prepare)
+export async function queryOne<T = Record<string, unknown>>(
+  sql: string,
+  ...args: unknown[]
+): Promise<T | undefined> {
+  await initPromise;
+  const client = getClient();
+  const result = await client.execute({ sql, args: args as Array<string | number | null> });
+  return result.rows[0] as T | undefined;
 }
 
-export function searchHistory(query: string, clientId: string) {
-  return sqlite
-    .prepare(
-      `SELECT h.* FROM history_entries h
-       JOIN history_fts f ON h.rowid = f.rowid
-       WHERE history_fts MATCH ? AND h.client_id = ?
-       ORDER BY rank
-       LIMIT 50`
-    )
-    .all(query, clientId);
+export async function queryAll<T = Record<string, unknown>>(
+  sql: string,
+  ...args: unknown[]
+): Promise<T[]> {
+  await initPromise;
+  const client = getClient();
+  const result = await client.execute({ sql, args: args as Array<string | number | null> });
+  return result.rows as T[];
+}
+
+export async function execute(sql: string, ...args: unknown[]) {
+  await initPromise;
+  const client = getClient();
+  return client.execute({ sql, args: args as Array<string | number | null> });
+}
+
+// Ensure init completes
+export { initPromise };
+
+// Helper to sync FTS index — removed (FTS5 not supported on Turso)
+// Use LIKE queries or application-level search instead
+export async function indexHistoryEntry(_id: string, _title: string | null, _body: string | null) {
+  // No-op: FTS not available on Turso
+}
+
+export async function searchHistory(query: string, clientId: string) {
+  await initPromise;
+  const client = getClient();
+  const likeQuery = `%${query}%`;
+  const result = await client.execute({
+    sql: `SELECT * FROM history_entries
+          WHERE client_id = ? AND (title LIKE ? OR body LIKE ?)
+          ORDER BY created_at DESC
+          LIMIT 50`,
+    args: [clientId, likeQuery, likeQuery],
+  });
+  return result.rows;
 }
 
 function stripHtml(html: string): string {

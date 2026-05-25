@@ -10,13 +10,13 @@ export async function PATCH(
   const { entryId } = await params;
   const body = await request.json();
 
-  db.update(historyEntries)
+  await db.update(historyEntries)
     .set({ ...body, updatedAt: new Date().toISOString() })
     .where(eq(historyEntries.id, entryId))
     .run();
 
   if (body.title !== undefined || body.body !== undefined) {
-    const entry = db.select().from(historyEntries).where(eq(historyEntries.id, entryId)).get();
+    const entry = await db.select().from(historyEntries).where(eq(historyEntries.id, entryId)).get();
     if (entry) {
       indexHistoryEntry(entryId, entry.title, entry.body);
     }
@@ -30,6 +30,6 @@ export async function DELETE(
   { params }: { params: Promise<{ slug: string; entryId: string }> }
 ) {
   const { entryId } = await params;
-  db.delete(historyEntries).where(eq(historyEntries.id, entryId)).run();
+  await db.delete(historyEntries).where(eq(historyEntries.id, entryId)).run();
   return NextResponse.json({ success: true });
 }

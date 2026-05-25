@@ -5,7 +5,7 @@ import { gte, isNull, and, desc, eq } from "drizzle-orm";
 
 export async function GET() {
   // Get all unsurfaced discoveries with score >= 7
-  const results = db
+  const results = await db
     .select({
       cd: clientDiscoveries,
       d: discoveries,

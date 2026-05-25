@@ -3,7 +3,7 @@ import { listIntegrations, deleteIntegrationTokens } from "@/lib/integration-sto
 
 export async function GET() {
   try {
-    const integrations = listIntegrations();
+    const integrations = await listIntegrations();
     return NextResponse.json(integrations);
   } catch {
     // DB_KEY not set — return all disconnected
@@ -21,6 +21,6 @@ export async function DELETE(request: Request) {
   if (!provider) {
     return NextResponse.json({ error: "Provider required" }, { status: 400 });
   }
-  deleteIntegrationTokens(provider);
+  await deleteIntegrationTokens(provider);
   return NextResponse.json({ success: true });
 }

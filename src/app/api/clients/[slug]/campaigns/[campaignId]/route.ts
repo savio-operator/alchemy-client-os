@@ -9,7 +9,7 @@ export async function PATCH(
 ) {
   const { campaignId } = await params;
   const body = await request.json();
-  db.update(campaigns)
+  await db.update(campaigns)
     .set({ ...body, updatedAt: new Date().toISOString() })
     .where(eq(campaigns.id, campaignId))
     .run();
@@ -21,6 +21,6 @@ export async function DELETE(
   { params }: { params: Promise<{ slug: string; campaignId: string }> }
 ) {
   const { campaignId } = await params;
-  db.delete(campaigns).where(eq(campaigns.id, campaignId)).run();
+  await db.delete(campaigns).where(eq(campaigns.id, campaignId)).run();
   return NextResponse.json({ success: true });
 }

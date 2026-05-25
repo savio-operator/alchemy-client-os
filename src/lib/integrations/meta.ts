@@ -2,14 +2,14 @@ import { getIntegrationTokens, saveIntegrationTokens } from "@/lib/integration-s
 
 const META_API = "https://graph.facebook.com/v21.0";
 
-function getTokens() {
-  const tokens = getIntegrationTokens("meta");
+async function getTokens() {
+  const tokens = await getIntegrationTokens("meta");
   if (!tokens) throw new Error("Meta not connected");
   return tokens;
 }
 
 async function metaFetch(path: string, options?: RequestInit) {
-  const tokens = getTokens();
+  const tokens = await getTokens();
   const url = `${META_API}${path}${path.includes("?") ? "&" : "?"}access_token=${tokens.accessToken}`;
   const res = await fetch(url, {
     ...options,
@@ -98,7 +98,7 @@ export async function exchangeMetaCode(code: string): Promise<void> {
   );
   const longData = await longRes.json();
 
-  saveIntegrationTokens("meta", {
+  await saveIntegrationTokens("meta", {
     accessToken: longData.access_token || data.access_token,
     expiresAt: longData.expires_in
       ? new Date(Date.now() + longData.expires_in * 1000).toISOString()

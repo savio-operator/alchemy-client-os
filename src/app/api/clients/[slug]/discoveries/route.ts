@@ -8,14 +8,14 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const client = db.select().from(clients).where(eq(clients.slug, slug)).get();
+  const client = await db.select().from(clients).where(eq(clients.slug, slug)).get();
   if (!client) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const url = new URL(request.url);
   const minScore = parseFloat(url.searchParams.get("minScore") || "0");
   const showDismissed = url.searchParams.get("dismissed") === "true";
 
-  const results = db
+  const results = await db
     .select({
       cd: clientDiscoveries,
       d: discoveries,

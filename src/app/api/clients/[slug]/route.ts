@@ -8,7 +8,7 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const client = db
+  const client = await db
     .select()
     .from(clients)
     .where(eq(clients.slug, slug))
@@ -18,13 +18,13 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const brief = db
+  const brief = await db
     .select()
     .from(clientBrief)
     .where(eq(clientBrief.clientId, client.id))
     .get();
 
-  const profile = db
+  const profile = await db
     .select()
     .from(clientProfile)
     .where(eq(clientProfile.clientId, client.id))
@@ -38,7 +38,7 @@ export async function PATCH(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const client = db
+  const client = await db
     .select()
     .from(clients)
     .where(eq(clients.slug, slug))
@@ -52,14 +52,14 @@ export async function PATCH(
   const { brief: briefData, ...clientData } = body;
 
   if (Object.keys(clientData).length > 0) {
-    db.update(clients)
+    await db.update(clients)
       .set(clientData)
       .where(eq(clients.id, client.id))
       .run();
   }
 
   if (briefData) {
-    db.insert(clientBrief)
+    await db.insert(clientBrief)
       .values({ clientId: client.id, ...briefData })
       .onConflictDoUpdate({
         target: clientBrief.clientId,

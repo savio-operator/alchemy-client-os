@@ -5,8 +5,8 @@ import crypto from "crypto";
 // Store PKCE verifiers in memory (short-lived, used during OAuth flow)
 const pkceVerifiers = new Map<string, string>();
 
-function getClient(): TwitterApi {
-  const tokens = getIntegrationTokens("x");
+async function getClient(): Promise<TwitterApi> {
+  const tokens = await getIntegrationTokens("x");
   if (!tokens) throw new Error("X not connected");
   return new TwitterApi(tokens.accessToken);
 }
@@ -54,7 +54,7 @@ export async function exchangeXCode(code: string, state: string): Promise<void> 
     redirectUri,
   });
 
-  saveIntegrationTokens("x", {
+  await saveIntegrationTokens("x", {
     accessToken,
     refreshToken,
     expiresAt: expiresIn
@@ -65,7 +65,7 @@ export async function exchangeXCode(code: string, state: string): Promise<void> 
 }
 
 export async function refreshXToken(): Promise<void> {
-  const tokens = getIntegrationTokens("x");
+  const tokens = await getIntegrationTokens("x");
   if (!tokens?.refreshToken) throw new Error("No refresh token");
 
   const clientId = process.env.X_CLIENT_ID;
@@ -77,7 +77,7 @@ export async function refreshXToken(): Promise<void> {
     tokens.refreshToken
   );
 
-  saveIntegrationTokens("x", {
+  await saveIntegrationTokens("x", {
     accessToken,
     refreshToken: refreshToken || tokens.refreshToken,
     expiresAt: expiresIn
@@ -88,12 +88,12 @@ export async function refreshXToken(): Promise<void> {
 }
 
 export async function postTweet(text: string) {
-  const client = getClient();
+  const client = await getClient();
   return client.v2.tweet(text);
 }
 
 export async function getMentions(userId?: string) {
-  const client = getClient();
+  const client = await getClient();
   if (!userId) {
     const me = await client.v2.me();
     userId = me.data.id;
@@ -102,6 +102,6 @@ export async function getMentions(userId?: string) {
 }
 
 export async function getMe() {
-  const client = getClient();
+  const client = await getClient();
   return client.v2.me();
 }

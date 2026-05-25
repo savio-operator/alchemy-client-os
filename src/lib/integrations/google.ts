@@ -21,8 +21,8 @@ function getOAuth2Client() {
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
-function getAuthedClient() {
-  const tokens = getIntegrationTokens("google");
+async function getAuthedClient() {
+  const tokens = await getIntegrationTokens("google");
   if (!tokens) throw new Error("Google not connected");
 
   const client = getOAuth2Client();
@@ -35,9 +35,9 @@ function getAuthedClient() {
   });
 
   // Auto-refresh handler
-  client.on("tokens", (newTokens) => {
-    const existing = getIntegrationTokens("google");
-    saveIntegrationTokens("google", {
+  client.on("tokens", async (newTokens) => {
+    const existing = await getIntegrationTokens("google");
+    await saveIntegrationTokens("google", {
       accessToken: newTokens.access_token || existing?.accessToken || "",
       refreshToken:
         newTokens.refresh_token || existing?.refreshToken || undefined,
@@ -71,7 +71,7 @@ export async function exchangeGoogleCode(code: string): Promise<void> {
   const client = getOAuth2Client();
   const { tokens } = await client.getToken(code);
 
-  saveIntegrationTokens("google", {
+  await saveIntegrationTokens("google", {
     accessToken: tokens.access_token || "",
     refreshToken: tokens.refresh_token || undefined,
     expiresAt: tokens.expiry_date
@@ -86,7 +86,7 @@ export async function exchangeGoogleCode(code: string): Promise<void> {
 export async function listGA4Properties(): Promise<
   Array<{ name: string; displayName: string; propertyId: string }>
 > {
-  const auth = getAuthedClient();
+  const auth = await getAuthedClient();
   const admin = google.analyticsadmin({ version: "v1beta", auth });
 
   const res = await admin.properties.list({
@@ -106,7 +106,7 @@ export async function getGA4Report(
   startDate = "28daysAgo",
   endDate = "today"
 ) {
-  const auth = getAuthedClient();
+  const auth = await getAuthedClient();
   const analyticsData = google.analyticsdata({ version: "v1beta", auth });
 
   const res = await analyticsData.properties.runReport({
@@ -155,7 +155,7 @@ export async function getGA4TopPages(
   startDate = "28daysAgo",
   endDate = "today"
 ) {
-  const auth = getAuthedClient();
+  const auth = await getAuthedClient();
   const analyticsData = google.analyticsdata({ version: "v1beta", auth });
 
   const res = await analyticsData.properties.runReport({
@@ -183,7 +183,7 @@ export async function getGA4TrafficSources(
   startDate = "28daysAgo",
   endDate = "today"
 ) {
-  const auth = getAuthedClient();
+  const auth = await getAuthedClient();
   const analyticsData = google.analyticsdata({ version: "v1beta", auth });
 
   const res = await analyticsData.properties.runReport({
@@ -209,7 +209,7 @@ export async function getGA4TrafficSources(
 export async function listSearchConsoleSites(): Promise<
   Array<{ siteUrl: string; permissionLevel: string }>
 > {
-  const auth = getAuthedClient();
+  const auth = await getAuthedClient();
   const searchconsole = google.searchconsole({ version: "v1", auth });
 
   const res = await searchconsole.sites.list();
@@ -225,7 +225,7 @@ export async function getSearchConsoleData(
   startDate?: string,
   endDate?: string
 ) {
-  const auth = getAuthedClient();
+  const auth = await getAuthedClient();
   const searchconsole = google.searchconsole({ version: "v1", auth });
 
   const now = new Date();
@@ -268,7 +268,7 @@ export async function getSearchConsolePages(
   startDate?: string,
   endDate?: string
 ) {
-  const auth = getAuthedClient();
+  const auth = await getAuthedClient();
   const searchconsole = google.searchconsole({ version: "v1", auth });
 
   const now = new Date();

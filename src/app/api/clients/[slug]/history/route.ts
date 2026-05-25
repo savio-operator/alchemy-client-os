@@ -9,7 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const client = db.select().from(clients).where(eq(clients.slug, slug)).get();
+  const client = await db.select().from(clients).where(eq(clients.slug, slug)).get();
   if (!client) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const url = new URL(request.url);
@@ -23,14 +23,14 @@ export async function GET(
 
   let entries;
   if (typeFilter) {
-    entries = db
+    entries = await db
       .select()
       .from(historyEntries)
       .where(and(eq(historyEntries.clientId, client.id), eq(historyEntries.type, typeFilter)))
       .orderBy(desc(historyEntries.createdAt))
       .all();
   } else {
-    entries = db
+    entries = await db
       .select()
       .from(historyEntries)
       .where(eq(historyEntries.clientId, client.id))
@@ -46,7 +46,7 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const client = db.select().from(clients).where(eq(clients.slug, slug)).get();
+  const client = await db.select().from(clients).where(eq(clients.slug, slug)).get();
   if (!client) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await request.json();
@@ -63,7 +63,7 @@ export async function POST(
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  db.insert(historyEntries)
+  await db.insert(historyEntries)
     .values({
       id,
       clientId: client.id,
@@ -77,6 +77,6 @@ export async function POST(
 
   indexHistoryEntry(id, title || null, entryBody || null);
 
-  const created = db.select().from(historyEntries).where(eq(historyEntries.id, id)).get();
+  const created = await db.select().from(historyEntries).where(eq(historyEntries.id, id)).get();
   return NextResponse.json(created, { status: 201 });
 }

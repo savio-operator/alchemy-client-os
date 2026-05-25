@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import RSSParser from "rss-parser";
-import { db, sqlite } from "@/db";
+import { db, queryOne } from "@/db";
 import { discoveries } from "@/db/schema";
 import { loadSources } from "@/lib/sources";
 import crypto from "crypto";
@@ -24,13 +24,15 @@ export async function POST() {
         const externalId = item.guid || item.link || item.title || "";
         if (!externalId) continue;
 
-        const existing = sqlite
-          .prepare("SELECT id FROM discoveries WHERE source_name = ? AND external_id = ?")
-          .get(source.name, externalId);
+        const existing = await queryOne(
+          "SELECT id FROM discoveries WHERE source_name = ? AND external_id = ?",
+          source.name,
+          externalId
+        );
         if (existing) continue;
 
         const id = crypto.randomUUID();
-        db.insert(discoveries)
+        await db.insert(discoveries)
           .values({
             id,
             sourceName: source.name,
@@ -47,8 +49,7 @@ export async function POST() {
             rawJson: JSON.stringify(item),
             fetchedAt: new Date().toISOString(),
             popularityScore: null,
-          })
-          .run();
+          });
         fetched++;
       }
     } catch {

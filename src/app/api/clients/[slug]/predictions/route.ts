@@ -11,10 +11,10 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const client = db.select().from(clients).where(eq(clients.slug, slug)).get();
+  const client = await db.select().from(clients).where(eq(clients.slug, slug)).get();
   if (!client) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const latest = db
+  const latest = await db
     .select()
     .from(predictions)
     .where(eq(predictions.clientId, client.id))
@@ -30,18 +30,18 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const client = db.select().from(clients).where(eq(clients.slug, slug)).get();
+  const client = await db.select().from(clients).where(eq(clients.slug, slug)).get();
   if (!client) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const brief = db.select().from(clientBrief).where(eq(clientBrief.clientId, client.id)).get();
-  const history = db
+  const brief = await db.select().from(clientBrief).where(eq(clientBrief.clientId, client.id)).get();
+  const history = await db
     .select()
     .from(historyEntries)
     .where(eq(historyEntries.clientId, client.id))
     .orderBy(desc(historyEntries.createdAt))
     .limit(20)
     .all();
-  const clientCampaigns = db
+  const clientCampaigns = await db
     .select()
     .from(campaigns)
     .where(eq(campaigns.clientId, client.id))
@@ -67,7 +67,7 @@ export async function POST(
     const forecast = await callAI(systemPrompt, context);
 
     const id = crypto.randomUUID();
-    db.insert(predictions)
+    await db.insert(predictions)
       .values({
         id,
         clientId: client.id,

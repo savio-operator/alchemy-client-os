@@ -16,7 +16,7 @@ export async function PATCH(
   if (body.surface) updateData.surfacedAt = new Date().toISOString();
 
   if (Object.keys(updateData).length > 0) {
-    db.update(clientDiscoveries)
+    await db.update(clientDiscoveries)
       .set(updateData)
       .where(eq(clientDiscoveries.id, discoveryId))
       .run();

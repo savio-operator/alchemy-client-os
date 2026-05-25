@@ -47,12 +47,12 @@ export interface IntegrationTokens {
   extra?: Record<string, string>;
 }
 
-export function saveIntegrationTokens(
+export async function saveIntegrationTokens(
   provider: string,
   tokens: IntegrationTokens
-): void {
+): Promise<void> {
   const encrypted = encrypt(JSON.stringify(tokens));
-  db.insert(settings)
+  await db.insert(settings)
     .values({ key: `integration:${provider}`, value: encrypted })
     .onConflictDoUpdate({
       target: settings.key,
@@ -61,10 +61,10 @@ export function saveIntegrationTokens(
     .run();
 }
 
-export function getIntegrationTokens(
+export async function getIntegrationTokens(
   provider: string
-): IntegrationTokens | null {
-  const row = db
+): Promise<IntegrationTokens | null> {
+  const row = await db
     .select()
     .from(settings)
     .where(eq(settings.key, `integration:${provider}`))
@@ -79,14 +79,14 @@ export function getIntegrationTokens(
   }
 }
 
-export function deleteIntegrationTokens(provider: string): void {
-  db.delete(settings)
+export async function deleteIntegrationTokens(provider: string): Promise<void> {
+  await db.delete(settings)
     .where(eq(settings.key, `integration:${provider}`))
     .run();
 }
 
-export function isIntegrationConnected(provider: string): boolean {
-  const tokens = getIntegrationTokens(provider);
+export async function isIntegrationConnected(provider: string): Promise<boolean> {
+  const tokens = await getIntegrationTokens(provider);
   if (!tokens) return false;
   if (tokens.expiresAt && new Date(tokens.expiresAt) < new Date()) {
     return false;
@@ -94,13 +94,16 @@ export function isIntegrationConnected(provider: string): boolean {
   return true;
 }
 
-export function listIntegrations(): Array<{
+export async function listIntegrations(): Promise<Array<{
   provider: string;
   connected: boolean;
-}> {
+}>> {
   const providers = ["meta", "x", "linkedin", "google", "razorpay"];
-  return providers.map((p) => ({
-    provider: p,
-    connected: isIntegrationConnected(p),
-  }));
+  const results = await Promise.all(
+    providers.map(async (p) => ({
+      provider: p,
+      connected: await isIntegrationConnected(p),
+    }))
+  );
+  return results;
 }

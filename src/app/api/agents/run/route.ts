@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     });
 
     const id = crypto.randomUUID();
-    db.insert(agentRuns)
+    await db.insert(agentRuns)
       .values({
         id,
         clientId,

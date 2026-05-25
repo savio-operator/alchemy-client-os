@@ -8,7 +8,7 @@ const SESSION_COOKIE = "adchemy_session";
 const SESSION_DAYS = 30;
 
 export async function isPinSet(): Promise<boolean> {
-  const result = db
+  const result = await db
     .select()
     .from(settings)
     .where(eq(settings.key, "pin_hash"))
@@ -19,14 +19,14 @@ export async function isPinSet(): Promise<boolean> {
 export async function setPin(pin: string): Promise<void> {
   const argon2 = await import("argon2");
   const hash = await argon2.hash(pin);
-  db.insert(settings)
+  await db.insert(settings)
     .values({ key: "pin_hash", value: hash })
     .onConflictDoUpdate({ target: settings.key, set: { value: hash } })
     .run();
 }
 
 export async function verifyPin(pin: string): Promise<boolean> {
-  const result = db
+  const result = await db
     .select()
     .from(settings)
     .where(eq(settings.key, "pin_hash"))
@@ -43,7 +43,7 @@ export async function createSession(): Promise<string> {
     Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000
   ).toISOString();
 
-  db.insert(sessions)
+  await db.insert(sessions)
     .values({ id, expiresAt, createdAt: new Date().toISOString() })
     .run();
 
@@ -64,7 +64,7 @@ export async function validateSession(): Promise<boolean> {
   const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
   if (!sessionId) return false;
 
-  const session = db
+  const session = await db
     .select()
     .from(sessions)
     .where(eq(sessions.id, sessionId))
@@ -73,7 +73,7 @@ export async function validateSession(): Promise<boolean> {
   if (!session) return false;
 
   if (new Date(session.expiresAt) < new Date()) {
-    db.delete(sessions).where(eq(sessions.id, sessionId)).run();
+    await db.delete(sessions).where(eq(sessions.id, sessionId)).run();
     return false;
   }
 
@@ -81,7 +81,7 @@ export async function validateSession(): Promise<boolean> {
   const newExpiry = new Date(
     Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000
   ).toISOString();
-  db.update(sessions)
+  await db.update(sessions)
     .set({ expiresAt: newExpiry })
     .where(eq(sessions.id, sessionId))
     .run();
@@ -101,7 +101,7 @@ export async function destroySession(): Promise<void> {
   const cookieStore = await cookies();
   const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
   if (sessionId) {
-    db.delete(sessions).where(eq(sessions.id, sessionId)).run();
+    await db.delete(sessions).where(eq(sessions.id, sessionId)).run();
     cookieStore.delete(SESSION_COOKIE);
   }
 }

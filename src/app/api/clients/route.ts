@@ -12,7 +12,7 @@ function slugify(name: string): string {
 }
 
 export async function GET() {
-  const allClients = db.select().from(clients).all();
+  const allClients = await db.select().from(clients).all();
   return NextResponse.json(allClients);
 }
 
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   let slug = slugify(name);
 
   // Ensure unique slug
-  const existing = db
+  const existing = await db
     .select()
     .from(clients)
     .where(eq(clients.slug, slug))
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     slug = `${slug}-${id.slice(0, 6)}`;
   }
 
-  db.insert(clients)
+  await db.insert(clients)
     .values({
       id,
       name,
@@ -61,13 +61,13 @@ export async function POST(request: Request) {
     .run();
 
   if (profile) {
-    db.insert(clientProfile)
+    await db.insert(clientProfile)
       .values({ clientId: id, rawJson: JSON.stringify(profile) })
       .run();
   }
 
   if (brief) {
-    db.insert(clientBrief)
+    await db.insert(clientBrief)
       .values({
         clientId: id,
         summaryMd: brief.summaryMd || null,
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
       .run();
   }
 
-  const created = db
+  const created = await db
     .select()
     .from(clients)
     .where(eq(clients.id, id))
