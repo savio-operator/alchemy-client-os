@@ -4,8 +4,10 @@ import * as schema from "./schema";
 import path from "path";
 import fs from "fs";
 
-const DB_DIR = path.join(process.cwd(), "data");
-const DB_PATH = path.join(DB_DIR, "adchemy.db");
+const DB_DIR = process.env.DB_PATH
+  ? path.dirname(process.env.DB_PATH)
+  : path.join(process.cwd(), "data");
+const DB_PATH = process.env.DB_PATH || path.join(DB_DIR, "adchemy.db");
 
 let _sqlite: Database.Database | null = null;
 let _db: BetterSQLite3Database<typeof schema> | null = null;
