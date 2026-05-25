@@ -1,15 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
-
 const isDisabled = process.env.AI_DISABLED === "1";
 
-let client: Anthropic | null = null;
-
-function getClient(): Anthropic {
-  if (!client) {
-    client = new Anthropic();
-  }
-  return client;
-}
+const GEMINI_ENDPOINT =
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
 export async function callAI(
   systemPrompt: string,
@@ -20,20 +12,34 @@ export async function callAI(
   }
 ): Promise<string> {
   if (isDisabled) {
-    throw new Error("AI is disabled via AI_DISABLED=1");
+    return "[AI disabled] Placeholder response — AI_DISABLED=1";
   }
 
-  const anthropic = getClient();
-  const response = await anthropic.messages.create({
-    model: options?.model ?? "claude-sonnet-4-6",
-    max_tokens: options?.maxTokens ?? 4096,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userMessage }],
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "GEMINI_API_KEY is not set. Please add it to your environment variables."
+    );
+  }
+
+  const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: "user", parts: [{ text: userMessage }] }],
+    }),
   });
 
-  const textBlock = response.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("No text response from AI");
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`Gemini API error (${res.status}): ${errorBody}`);
   }
-  return textBlock.text;
+
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) {
+    throw new Error("No text response from Gemini");
+  }
+  return text;
 }

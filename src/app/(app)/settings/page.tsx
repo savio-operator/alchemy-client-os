@@ -12,7 +12,9 @@ import {
   Sun,
   Rss,
   Zap,
+  LogOut,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -45,6 +47,7 @@ const PROVIDER_INFO: Record<string, { label: string; description: string }> = {
 };
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
   const [polling, setPolling] = useState(false);
@@ -67,6 +70,7 @@ export default function SettingsPage() {
     const next = !dark;
     setDark(next);
     document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
   };
 
   const handleDisconnect = async (provider: string) => {
@@ -210,7 +214,7 @@ export default function SettingsPage() {
       </section>
 
       {/* Integrations */}
-      <section>
+      <section className="mb-8">
         <h2 className="text-sm font-medium mb-3">Integrations</h2>
         {loading ? (
           <div className="flex justify-center py-6">
@@ -280,6 +284,36 @@ export default function SettingsPage() {
             })}
           </div>
         )}
+      </section>
+
+      {/* Sign Out */}
+      <section>
+        <h2 className="text-sm font-medium mb-3">Account</h2>
+        <div className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <LogOut className="w-4 h-4 text-[var(--ink-muted)]" strokeWidth={1.5} />
+              <div>
+                <p className="text-sm font-medium">Sign out</p>
+                <p className="text-xs text-[var(--ink-muted)]">
+                  End your current session
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1 text-destructive"
+              onClick={async () => {
+                await fetch("/api/auth/logout", { method: "POST" });
+                router.push("/login");
+              }}
+            >
+              <LogOut className="w-3.5 h-3.5" strokeWidth={1.5} />
+              Sign out
+            </Button>
+          </div>
+        </div>
       </section>
     </div>
   );
