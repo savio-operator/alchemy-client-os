@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: adchemy-client-os
+    runtime: node
+    buildCommand: pnpm install && pnpm build
+    startCommand: pnpm start
+    healthCheckPath: /api/health
+    disk:
+      name: adchemy-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DB_KEY
+        generateValue: true
+      - key: DB_PATH
+        value: /data/adchemy.db
