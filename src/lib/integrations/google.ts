@@ -8,6 +8,10 @@ import crypto from "crypto";
 const SCOPES = [
   "https://www.googleapis.com/auth/analytics.readonly",
   "https://www.googleapis.com/auth/webmasters.readonly",
+  "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/calendar",
+  "https://www.googleapis.com/auth/spreadsheets",
 ];
 
 function getOAuth2Client() {
@@ -21,7 +25,7 @@ function getOAuth2Client() {
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
-async function getAuthedClient() {
+export async function getAuthedClient() {
   const tokens = await getIntegrationTokens("google");
   if (!tokens) throw new Error("Google not connected");
 
