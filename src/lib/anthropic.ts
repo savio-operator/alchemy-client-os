@@ -53,7 +53,9 @@ export async function callAI(
     );
   }
 
-  const modelsToTry = options?.model ? [options.model] : MODELS;
+  // Only use the requested model if it's a valid Gemini model; otherwise use defaults
+  const isGeminiModel = options?.model?.startsWith("gemini-");
+  const modelsToTry = isGeminiModel ? [options.model!] : MODELS;
 
   for (const model of modelsToTry) {
     const result = await callGeminiModel(model, apiKey, systemPrompt, userMessage);
