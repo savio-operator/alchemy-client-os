@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Save, Loader2, RefreshCw, TrendingUp } from "lucide-react";
+import { Save, Loader2, RefreshCw, TrendingUp, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [autoSaved, setAutoSaved] = useState(false);
   const [draft, setDraft] = useState<Brief>({
     summaryMd: "",
     northStar: "",
@@ -39,6 +40,7 @@ export default function ProfilePage() {
     voice: "",
     constraints: "",
   });
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetch(`/api/clients/${slug}`)
@@ -52,16 +54,35 @@ export default function ProfilePage() {
       });
   }, [slug]);
 
-  const handleSave = async () => {
+  const doSave = useCallback(async (briefData: Brief) => {
     setSaving(true);
     await fetch(`/api/clients/${slug}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brief: draft }),
+      body: JSON.stringify({ brief: briefData }),
     });
-    setClient((prev) => (prev ? { ...prev, brief: draft } : null));
-    setEditing(false);
+    setClient((prev) => (prev ? { ...prev, brief: briefData } : null));
     setSaving(false);
+    setAutoSaved(true);
+    setTimeout(() => setAutoSaved(false), 2000);
+  }, [slug]);
+
+  // Auto-save: debounce 2 seconds after typing stops
+  const updateDraft = useCallback((newDraft: Brief) => {
+    setDraft(newDraft);
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => doSave(newDraft), 2000);
+  }, [doSave]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  }, []);
+
+  const handleSave = async () => {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    await doSave(draft);
+    setEditing(false);
   };
 
   if (loading) {
@@ -87,20 +108,28 @@ export default function ProfilePage() {
             {client.name}'s synthesized brief
           </p>
         </div>
-        <Button
-          variant={editing ? "default" : "outline"}
-          size="sm"
-          onClick={editing ? handleSave : () => setEditing(true)}
-          disabled={saving}
-          className={editing ? "bg-[var(--accent-clay)] hover:bg-[var(--accent-clay)]/90 text-white" : ""}
-        >
-          {saving ? (
-            <Loader2 className="w-4 h-4 animate-spin mr-1" />
-          ) : editing ? (
-            <Save className="w-4 h-4 mr-1" strokeWidth={1.5} />
-          ) : null}
-          {editing ? "Save" : "Edit brief"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {autoSaved && (
+            <span className="flex items-center gap-1 text-xs text-green-600">
+              <Check className="w-3.5 h-3.5" strokeWidth={2} />
+              Saved
+            </span>
+          )}
+          <Button
+            variant={editing ? "default" : "outline"}
+            size="sm"
+            onClick={editing ? handleSave : () => setEditing(true)}
+            disabled={saving}
+            className={editing ? "bg-[var(--accent-clay)] hover:bg-[var(--accent-clay)]/90 text-white" : ""}
+          >
+            {saving ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-1" />
+            ) : editing ? (
+              <Save className="w-4 h-4 mr-1" strokeWidth={1.5} />
+            ) : null}
+            {editing ? "Save" : "Edit brief"}
+          </Button>
+        </div>
       </div>
 
       {hasNoBrief && !editing ? (
@@ -129,34 +158,34 @@ export default function ProfilePage() {
             value={editing ? draft.summaryMd : brief?.summaryMd}
             editing={editing}
             multiline
-            onChange={(v) => setDraft({ ...draft, summaryMd: v })}
+            onChange={(v) => updateDraft({ ...draft, summaryMd: v })}
           />
           <BriefField
             label="North Star"
             value={editing ? draft.northStar : brief?.northStar}
             editing={editing}
-            onChange={(v) => setDraft({ ...draft, northStar: v })}
+            onChange={(v) => updateDraft({ ...draft, northStar: v })}
           />
           <BriefField
             label="Audience"
             value={editing ? draft.audience : brief?.audience}
             editing={editing}
             multiline
-            onChange={(v) => setDraft({ ...draft, audience: v })}
+            onChange={(v) => updateDraft({ ...draft, audience: v })}
           />
           <BriefField
             label="Voice"
             value={editing ? draft.voice : brief?.voice}
             editing={editing}
             multiline
-            onChange={(v) => setDraft({ ...draft, voice: v })}
+            onChange={(v) => updateDraft({ ...draft, voice: v })}
           />
           <BriefField
             label="Constraints"
             value={editing ? draft.constraints : brief?.constraints}
             editing={editing}
             multiline
-            onChange={(v) => setDraft({ ...draft, constraints: v })}
+            onChange={(v) => updateDraft({ ...draft, constraints: v })}
           />
 
           {editing && (

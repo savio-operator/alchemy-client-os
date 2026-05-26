@@ -188,11 +188,11 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json(jsonRpcError(null, -32700, "Parse error"));
+    return NextResponse.json(jsonRpcError(0, -32700, "Parse error"));
   }
 
   if (body.jsonrpc !== "2.0" || !body.method) {
-    return NextResponse.json(jsonRpcError(body.id ?? null, -32600, "Invalid Request"));
+    return NextResponse.json(jsonRpcError(body.id ?? 0, -32600, "Invalid Request"));
   }
 
   const { method, params, id } = body;

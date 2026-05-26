@@ -1,7 +1,38 @@
 const isDisabled = process.env.AI_DISABLED === "1";
 
-const GEMINI_ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+const GEMINI_BASE =
+  "https://generativelanguage.googleapis.com/v1beta/models";
+
+// Models to try in order — each has its own separate free-tier quota
+const MODELS = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"];
+
+async function callGeminiModel(
+  model: string,
+  apiKey: string,
+  systemPrompt: string,
+  userMessage: string
+): Promise<string | null> {
+  const res = await fetch(
+    `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: "user", parts: [{ text: userMessage }] }],
+      }),
+    }
+  );
+
+  if (res.status === 429) return null; // quota exhausted, try next model
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`Gemini API error (${res.status}): ${errorBody}`);
+  }
+
+  const data = await res.json();
+  return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+}
 
 export async function callAI(
   systemPrompt: string,
@@ -22,24 +53,14 @@ export async function callAI(
     );
   }
 
-  const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: "user", parts: [{ text: userMessage }] }],
-    }),
-  });
+  const modelsToTry = options?.model ? [options.model] : MODELS;
 
-  if (!res.ok) {
-    const errorBody = await res.text();
-    throw new Error(`Gemini API error (${res.status}): ${errorBody}`);
+  for (const model of modelsToTry) {
+    const result = await callGeminiModel(model, apiKey, systemPrompt, userMessage);
+    if (result) return result;
   }
 
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    throw new Error("No text response from Gemini");
-  }
-  return text;
+  throw new Error(
+    "All Gemini models rate-limited. Free tier daily quota exhausted — resets tomorrow."
+  );
 }

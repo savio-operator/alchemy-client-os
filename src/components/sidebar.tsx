@@ -28,14 +28,26 @@ export function Sidebar({ clients, onNewClient }: SidebarProps) {
     >
       {/* Header */}
       <div className="flex items-center justify-between p-3 h-14">
-        {expanded && (
-          <motion.span
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-sm font-semibold tracking-tight truncate"
-          >
-            Adchemy
-          </motion.span>
+        {expanded ? (
+          <Link href="/">
+            <motion.span
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-sm font-semibold tracking-tight truncate hover:text-[var(--accent-clay)] transition-colors duration-120 cursor-pointer"
+            >
+              Adchemy
+            </motion.span>
+          </Link>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger
+              className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)] transition-colors duration-120"
+              onClick={() => window.location.href = "/"}
+            >
+              <Briefcase className="w-4 h-4 text-[var(--ink-muted)]" strokeWidth={1.5} />
+            </TooltipTrigger>
+            <TooltipContent side="right">Home</TooltipContent>
+          </Tooltip>
         )}
         <button
           onClick={toggle}
