@@ -17,11 +17,12 @@ export async function isPinSet(): Promise<boolean> {
 }
 
 export async function setPin(pin: string): Promise<void> {
-  const argon2 = await import("argon2");
-  const hash = await argon2.hash(pin);
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(pin, salt, 64).toString("hex");
+  const stored = `${salt}:${hash}`;
   await db.insert(settings)
-    .values({ key: "pin_hash", value: hash })
-    .onConflictDoUpdate({ target: settings.key, set: { value: hash } })
+    .values({ key: "pin_hash", value: stored })
+    .onConflictDoUpdate({ target: settings.key, set: { value: stored } })
     .run();
 }
 
@@ -33,8 +34,9 @@ export async function verifyPin(pin: string): Promise<boolean> {
     .get();
   if (!result) return false;
 
-  const argon2 = await import("argon2");
-  return argon2.verify(result.value, pin);
+  const [salt, storedHash] = result.value.split(":");
+  const hash = crypto.scryptSync(pin, salt, 64).toString("hex");
+  return hash === storedHash;
 }
 
 export async function createSession(): Promise<string> {
