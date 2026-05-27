@@ -4,7 +4,7 @@ const GEMINI_BASE =
   "https://generativelanguage.googleapis.com/v1beta/models";
 
 // Models to try in order — each has its own separate free-tier quota
-const MODELS = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"];
+const MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
 
 async function callGeminiModel(
   model: string,
