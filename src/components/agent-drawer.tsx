@@ -1,35 +1,50 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Bot, Send, Loader2 } from "lucide-react";
+import {
+  X,
+  Bot,
+  Send,
+  Loader2,
+  Plus,
+  MessageSquare,
+  Trash2,
+  ChevronLeft,
+} from "lucide-react";
 import { useDrawer } from "@/store/drawer";
+import { useChat } from "@/store/chat";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-
-interface AgentOption {
-  name: string;
-  description: string;
-}
-
-interface RunResult {
-  role: "user" | "agent";
-  content: string;
-  agentName?: string;
-}
+import { useState } from "react";
 
 export function AgentDrawer() {
   const { open, setOpen } = useDrawer();
   const params = useParams();
   const slug = params?.slug as string | undefined;
 
-  const [agents, setAgents] = useState<AgentOption[]>([]);
-  const [selectedAgent, setSelectedAgent] = useState("");
-  const [input, setInput] = useState("");
-  const [running, setRunning] = useState(false);
-  const [history, setHistory] = useState<RunResult[]>([]);
+  const {
+    activeConversationId,
+    conversations,
+    messages,
+    showList,
+    setActiveConversation,
+    setConversations,
+    setMessages,
+    addMessage,
+    addConversation,
+    toggleList,
+    setShowList,
+    reset,
+  } = useChat();
 
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [clientId, setClientId] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Keyboard shortcut
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === "j" && (e.metaKey || e.ctrlKey)) {
@@ -41,105 +56,137 @@ export function AgentDrawer() {
     return () => document.removeEventListener("keydown", down);
   }, [open, setOpen]);
 
+  // Load client ID and conversations when drawer opens
   useEffect(() => {
-    if (open) {
-      fetch("/api/agents")
-        .then((r) => r.json())
-        .then((data) => {
-          setAgents(data);
-          if (data.length > 0 && !selectedAgent) {
-            setSelectedAgent(data[0].name);
-          }
-        });
-    }
-  }, [open, selectedAgent]);
+    if (!open || !slug) return;
 
-  const handleRun = async () => {
-    if (!input.trim() || !selectedAgent || running) return;
+    fetch(`/api/clients/${slug}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.id) {
+          setClientId(data.id);
+          fetch(`/api/chat/conversations?clientId=${data.id}`)
+            .then((r) => r.json())
+            .then((convos) => setConversations(convos));
+        }
+      });
+  }, [open, slug, setConversations]);
+
+  // Load messages when conversation changes
+  useEffect(() => {
+    if (!activeConversationId) {
+      setMessages([]);
+      return;
+    }
+    fetch(`/api/chat/conversations/${activeConversationId}`)
+      .then((r) => r.json())
+      .then((msgs) => setMessages(msgs));
+  }, [activeConversationId, setMessages]);
+
+  // Auto-scroll
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || sending || !clientId) return;
 
     const userMessage = input.trim();
-    setHistory((h) => [...h, { role: "user", content: userMessage }]);
     setInput("");
-    setRunning(true);
+    setSending(true);
+
+    // Optimistically add user message
+    addMessage({
+      id: `temp-${Date.now()}`,
+      conversationId: activeConversationId || "",
+      role: "user",
+      content: userMessage,
+      createdAt: new Date().toISOString(),
+    });
 
     try {
-      // Get client ID if we're on a client page
-      let clientId = "";
-      if (slug) {
-        const clientRes = await fetch(`/api/clients/${slug}`);
-        if (clientRes.ok) {
-          const clientData = await clientRes.json();
-          clientId = clientData.id;
-        }
-      }
-
-      // Enrich input with client context if on a client page
-      let enrichedInput = userMessage;
-      if (slug && clientId) {
-        try {
-          const [briefRes, ideasRes, campaignsRes] = await Promise.all([
-            fetch(`/api/clients/${slug}`),
-            fetch(`/api/clients/${slug}/ideas`),
-            fetch(`/api/clients/${slug}/campaigns`),
-          ]);
-          const client = briefRes.ok ? await briefRes.json() : null;
-          const ideas = ideasRes.ok ? await ideasRes.json() : [];
-          const campaigns = campaignsRes.ok ? await campaignsRes.json() : [];
-
-          const context = [
-            `--- CLIENT CONTEXT ---`,
-            `Name: ${client?.name || "Unknown"}`,
-            `Industry: ${client?.industry || "N/A"}`,
-            `Stage: ${client?.stage || "N/A"}`,
-            client?.brief?.summaryMd ? `Brief: ${client.brief.summaryMd}` : null,
-            client?.brief?.northStar ? `North Star: ${client.brief.northStar}` : null,
-            client?.brief?.audience ? `Audience: ${client.brief.audience}` : null,
-            client?.brief?.voice ? `Voice: ${client.brief.voice}` : null,
-            ideas.length > 0 ? `Ideas (${ideas.length}): ${ideas.map((i: { title: string }) => i.title).join(", ")}` : null,
-            campaigns.length > 0 ? `Campaigns (${campaigns.length}): ${campaigns.map((c: { type: string; status: string }) => `${c.type} (${c.status})`).join(", ")}` : null,
-            `--- END CONTEXT ---`,
-            ``,
-            `User request: ${userMessage}`,
-          ].filter(Boolean).join("\n");
-
-          enrichedInput = context;
-        } catch {
-          // Fall back to raw input if context fetch fails
-        }
-      }
-
-      const res = await fetch("/api/agents/run", {
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          agentName: selectedAgent,
-          clientId: clientId || "global",
-          input: enrichedInput,
+          clientId,
+          conversationId: activeConversationId || undefined,
+          message: userMessage,
         }),
       });
 
       if (!res.ok) {
         const err = await res.json();
-        setHistory((h) => [
-          ...h,
-          { role: "agent", content: `Error: ${err.error}`, agentName: selectedAgent },
-        ]);
-      } else {
-        const data = await res.json();
-        setHistory((h) => [
-          ...h,
-          { role: "agent", content: data.output, agentName: selectedAgent },
-        ]);
+        addMessage({
+          id: `err-${Date.now()}`,
+          conversationId: activeConversationId || "",
+          role: "assistant",
+          content: `Error: ${err.error || "Something went wrong"}`,
+          createdAt: new Date().toISOString(),
+        });
+        setSending(false);
+        return;
       }
+
+      const data = await res.json();
+
+      // If this was a new conversation, update state
+      if (!activeConversationId) {
+        setActiveConversation(data.conversationId);
+        addConversation({
+          id: data.conversationId,
+          clientId,
+          title: userMessage.slice(0, 60),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      // Add assistant response
+      addMessage({
+        id: `ai-${Date.now()}`,
+        conversationId: data.conversationId,
+        role: "assistant",
+        content: data.message,
+        toolCalls: data.toolCalls ? JSON.stringify(data.toolCalls) : null,
+        createdAt: new Date().toISOString(),
+      });
     } catch {
-      setHistory((h) => [
-        ...h,
-        { role: "agent", content: "Connection error", agentName: selectedAgent },
-      ]);
+      addMessage({
+        id: `err-${Date.now()}`,
+        conversationId: activeConversationId || "",
+        role: "assistant",
+        content: "Connection error. Please try again.",
+        createdAt: new Date().toISOString(),
+      });
     } finally {
-      setRunning(false);
+      setSending(false);
+    }
+  }, [
+    input,
+    sending,
+    clientId,
+    activeConversationId,
+    addMessage,
+    addConversation,
+    setActiveConversation,
+  ]);
+
+  const handleNewChat = () => {
+    setActiveConversation(null);
+    setMessages([]);
+    setShowList(false);
+  };
+
+  const handleDeleteConversation = async (id: string) => {
+    await fetch(`/api/chat/conversations/${id}`, { method: "DELETE" });
+    setConversations(conversations.filter((c) => c.id !== id));
+    if (activeConversationId === id) {
+      handleNewChat();
     }
   };
+
+  const visibleMessages = messages.filter((m) => m.role !== "tool_result");
 
   return (
     <AnimatePresence>
@@ -154,116 +201,214 @@ export function AgentDrawer() {
           {/* Header */}
           <div className="h-14 flex items-center justify-between px-4 border-b border-[var(--rule)]">
             <div className="flex items-center gap-2">
-              <Bot className="w-4 h-4 text-[var(--ink-muted)]" strokeWidth={1.5} />
-              <span className="text-sm font-medium">Agent Runner</span>
-            </div>
-            <button
-              onClick={() => setOpen(false)}
-              className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)] transition-colors duration-120"
-              aria-label="Close agent runner"
-            >
-              <X className="w-4 h-4 text-[var(--ink-muted)]" strokeWidth={1.5} />
-            </button>
-          </div>
-
-          {/* Agent picker */}
-          <div className="px-4 py-3 border-b border-[var(--rule)]">
-            <select
-              value={selectedAgent}
-              onChange={(e) => setSelectedAgent(e.target.value)}
-              className="w-full h-8 px-2 text-sm bg-[var(--bg)] border border-[var(--rule)] rounded-[var(--radius-sm)]"
-            >
-              {agents.map((a) => (
-                <option key={a.name} value={a.name}>
-                  {a.name} — {a.description}
-                </option>
-              ))}
-              {agents.length === 0 && (
-                <option value="">No agents available</option>
+              {showList ? (
+                <button
+                  onClick={() => setShowList(false)}
+                  className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)]"
+                >
+                  <ChevronLeft
+                    className="w-4 h-4 text-[var(--ink-muted)]"
+                    strokeWidth={1.5}
+                  />
+                </button>
+              ) : (
+                <button
+                  onClick={toggleList}
+                  className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)]"
+                  title="Chat history"
+                >
+                  <MessageSquare
+                    className="w-4 h-4 text-[var(--ink-muted)]"
+                    strokeWidth={1.5}
+                  />
+                </button>
               )}
-            </select>
+              <span className="text-sm font-medium">
+                {showList ? "Chats" : "Chat"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleNewChat}
+                className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)]"
+                title="New chat"
+              >
+                <Plus
+                  className="w-4 h-4 text-[var(--ink-muted)]"
+                  strokeWidth={1.5}
+                />
+              </button>
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  reset();
+                }}
+                className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)]"
+                aria-label="Close chat"
+              >
+                <X
+                  className="w-4 h-4 text-[var(--ink-muted)]"
+                  strokeWidth={1.5}
+                />
+              </button>
+            </div>
           </div>
 
-          {/* Chat history */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-            {history.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <div className="w-12 h-12 rounded-[var(--radius)] bg-[var(--muted)] flex items-center justify-center mb-4">
-                  <Bot className="w-5 h-5 text-[var(--ink-muted)]" strokeWidth={1.5} />
+          {showList ? (
+            /* Conversation list */
+            <div className="flex-1 overflow-y-auto">
+              {conversations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center px-6">
+                  <MessageSquare
+                    className="w-8 h-8 text-[var(--ink-muted)] mb-3"
+                    strokeWidth={1}
+                  />
+                  <p className="text-sm text-[var(--ink-muted)]">
+                    No previous chats
+                  </p>
                 </div>
-                <p className="text-sm font-medium mb-1">Ready to run</p>
-                <p className="text-xs text-[var(--ink-muted)] max-w-[240px]">
-                  Select an agent and send a message. Attach context by describing what you need analyzed.
+              ) : (
+                conversations.map((c) => (
+                  <div
+                    key={c.id}
+                    className={`group flex items-center justify-between px-4 py-3 border-b border-[var(--rule)] cursor-pointer hover:bg-[var(--muted)] transition-colors ${
+                      c.id === activeConversationId
+                        ? "bg-[var(--muted)]"
+                        : ""
+                    }`}
+                    onClick={() => {
+                      setActiveConversation(c.id);
+                      setShowList(false);
+                    }}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {c.title || "Untitled chat"}
+                      </p>
+                      <p className="text-[10px] text-[var(--ink-muted)]">
+                        {new Date(c.updatedAt).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                        })}
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteConversation(c.id);
+                      }}
+                      className="w-6 h-6 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[var(--rule)]"
+                    >
+                      <Trash2
+                        className="w-3 h-3 text-[var(--ink-muted)]"
+                        strokeWidth={1.5}
+                      />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+                {visibleMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center">
+                    <div className="w-12 h-12 rounded-[var(--radius)] bg-[var(--muted)] flex items-center justify-center mb-4">
+                      <Bot
+                        className="w-5 h-5 text-[var(--ink-muted)]"
+                        strokeWidth={1.5}
+                      />
+                    </div>
+                    <p className="text-sm font-medium mb-1">
+                      Start a conversation
+                    </p>
+                    <p className="text-xs text-[var(--ink-muted)] max-w-[240px]">
+                      Ask anything — schedule meetings, add ideas, search
+                      history, or just chat about strategy.
+                    </p>
+                  </div>
+                ) : (
+                  visibleMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={msg.role === "user" ? "ml-8" : "mr-4"}
+                    >
+                      {msg.role === "assistant" && (
+                        <p className="text-[10px] text-[var(--ink-muted)] mb-1 font-mono">
+                          adchemy
+                        </p>
+                      )}
+                      <div
+                        className={`text-sm rounded-[var(--radius-sm)] p-3 ${
+                          msg.role === "user"
+                            ? "bg-[var(--accent-clay)]/10 text-[var(--ink)]"
+                            : "bg-[var(--muted)]"
+                        }`}
+                      >
+                        <div className="whitespace-pre-wrap prose-measure text-sm">
+                          {msg.content}
+                        </div>
+                        {msg.toolCalls && (
+                          <div className="mt-2 pt-2 border-t border-[var(--rule)]">
+                            <p className="text-[10px] text-[var(--ink-muted)] font-mono">
+                              Tools used:{" "}
+                              {JSON.parse(msg.toolCalls)
+                                .map(
+                                  (tc: { name: string }) => tc.name
+                                )
+                                .join(", ")}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+                {sending && (
+                  <div className="flex items-center gap-2 text-xs text-[var(--ink-muted)]">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Thinking...
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input */}
+              <div className="px-4 py-3 border-t border-[var(--rule)]">
+                <div className="flex gap-2">
+                  <Textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                        handleSend();
+                      }
+                    }}
+                    placeholder="Ask anything..."
+                    rows={2}
+                    className="text-sm flex-1 resize-none"
+                    disabled={sending || !clientId}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSend}
+                    disabled={sending || !input.trim() || !clientId}
+                    className="self-end bg-[var(--accent-clay)] hover:bg-[var(--accent-clay)]/90 text-white"
+                  >
+                    {sending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" strokeWidth={1.5} />
+                    )}
+                  </Button>
+                </div>
+                <p className="text-[10px] text-[var(--ink-muted)] mt-1">
+                  Cmd+Enter to send · Cmd+J to toggle
                 </p>
               </div>
-            ) : (
-              history.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`${
-                    msg.role === "user" ? "ml-8" : "mr-4"
-                  }`}
-                >
-                  {msg.role === "agent" && (
-                    <p className="text-[10px] text-[var(--ink-muted)] mb-1 font-mono">
-                      {msg.agentName}
-                    </p>
-                  )}
-                  <div
-                    className={`text-sm rounded-[var(--radius-sm)] p-3 ${
-                      msg.role === "user"
-                        ? "bg-[var(--accent-clay)]/10 text-[var(--ink)]"
-                        : "bg-[var(--muted)]"
-                    }`}
-                  >
-                    <div className="whitespace-pre-wrap prose-measure text-sm [&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-medium">
-                      {msg.content}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-            {running && (
-              <div className="flex items-center gap-2 text-xs text-[var(--ink-muted)]">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Running {selectedAgent}...
-              </div>
-            )}
-          </div>
-
-          {/* Input */}
-          <div className="px-4 py-3 border-t border-[var(--rule)]">
-            <div className="flex gap-2">
-              <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                    handleRun();
-                  }
-                }}
-                placeholder="Describe what you need analyzed..."
-                rows={2}
-                className="text-sm flex-1 resize-none"
-                disabled={running || agents.length === 0}
-              />
-              <Button
-                size="sm"
-                onClick={handleRun}
-                disabled={running || !input.trim() || agents.length === 0}
-                className="self-end bg-[var(--accent-clay)] hover:bg-[var(--accent-clay)]/90 text-white"
-              >
-                {running ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" strokeWidth={1.5} />
-                )}
-              </Button>
-            </div>
-            <p className="text-[10px] text-[var(--ink-muted)] mt-1">
-              Cmd+Enter to send
-            </p>
-          </div>
+            </>
+          )}
         </motion.aside>
       )}
     </AnimatePresence>

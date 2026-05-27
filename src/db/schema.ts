@@ -158,6 +158,39 @@ export const predictions = sqliteTable("predictions", {
   createdAt: text("created_at").notNull(),
 });
 
+// --- Chat tables ---
+
+export const conversations = sqliteTable("conversations", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  title: text("title"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const messages = sqliteTable("messages", {
+  id: text("id").primaryKey(),
+  conversationId: text("conversation_id")
+    .notNull()
+    .references(() => conversations.id, { onDelete: "cascade" }),
+  role: text("role").notNull(), // user | assistant | tool_result
+  content: text("content").notNull(),
+  toolCalls: text("tool_calls"), // JSON: [{name, args, result}]
+  createdAt: text("created_at").notNull(),
+});
+
+export const memories = sqliteTable("memories", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  fact: text("fact").notNull(),
+  sourceConversationId: text("source_conversation_id"),
+  createdAt: text("created_at").notNull(),
+});
+
 // --- Types ---
 
 export type Client = typeof clients.$inferSelect;
@@ -172,3 +205,6 @@ export type Discovery = typeof discoveries.$inferSelect;
 export type ClientDiscovery = typeof clientDiscoveries.$inferSelect;
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type Prediction = typeof predictions.$inferSelect;
+export type Conversation = typeof conversations.$inferSelect;
+export type Message = typeof messages.$inferSelect;
+export type Memory = typeof memories.$inferSelect;
