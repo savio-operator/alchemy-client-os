@@ -12,6 +12,8 @@ import {
   MessageSquare,
   Trash2,
   ChevronLeft,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { useDrawer } from "@/store/drawer";
 import { useChat } from "@/store/chat";
@@ -42,6 +44,8 @@ export function AgentDrawer() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [clientId, setClientId] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Keyboard shortcut
@@ -58,7 +62,16 @@ export function AgentDrawer() {
 
   // Load client ID and conversations when drawer opens
   useEffect(() => {
-    if (!open || !slug) return;
+    if (!open) return;
+
+    if (!slug) {
+      // Homepage — global mode
+      setClientId("global");
+      fetch(`/api/chat/conversations?clientId=global`)
+        .then((r) => r.json())
+        .then((convos) => setConversations(convos));
+      return;
+    }
 
     fetch(`/api/clients/${slug}`)
       .then((r) => r.json())
@@ -186,6 +199,24 @@ export function AgentDrawer() {
     }
   };
 
+  const handleRename = async (id: string) => {
+    if (!editTitle.trim()) {
+      setEditingId(null);
+      return;
+    }
+    await fetch(`/api/chat/conversations/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: editTitle.trim() }),
+    });
+    setConversations(
+      conversations.map((c) =>
+        c.id === id ? { ...c, title: editTitle.trim() } : c
+      )
+    );
+    setEditingId(null);
+  };
+
   const visibleMessages = messages.filter((m) => m.role !== "tool_result");
 
   return (
@@ -277,14 +308,31 @@ export function AgentDrawer() {
                         : ""
                     }`}
                     onClick={() => {
-                      setActiveConversation(c.id);
-                      setShowList(false);
+                      if (editingId !== c.id) {
+                        setActiveConversation(c.id);
+                        setShowList(false);
+                      }
                     }}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {c.title || "Untitled chat"}
-                      </p>
+                      {editingId === c.id ? (
+                        <input
+                          type="text"
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleRename(c.id);
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-sm font-medium w-full bg-transparent border-b border-[var(--accent-clay)] outline-none"
+                          autoFocus
+                        />
+                      ) : (
+                        <p className="text-sm font-medium truncate">
+                          {c.title || "Untitled chat"}
+                        </p>
+                      )}
                       <p className="text-[10px] text-[var(--ink-muted)]">
                         {new Date(c.updatedAt).toLocaleDateString("en-IN", {
                           day: "numeric",
@@ -292,18 +340,48 @@ export function AgentDrawer() {
                         })}
                       </p>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteConversation(c.id);
-                      }}
-                      className="w-6 h-6 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-[var(--rule)]"
-                    >
-                      <Trash2
-                        className="w-3 h-3 text-[var(--ink-muted)]"
-                        strokeWidth={1.5}
-                      />
-                    </button>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
+                      {editingId === c.id ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRename(c.id);
+                          }}
+                          className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--rule)]"
+                        >
+                          <Check
+                            className="w-3 h-3 text-green-600"
+                            strokeWidth={2}
+                          />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingId(c.id);
+                            setEditTitle(c.title || "");
+                          }}
+                          className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--rule)]"
+                        >
+                          <Pencil
+                            className="w-3 h-3 text-[var(--ink-muted)]"
+                            strokeWidth={1.5}
+                          />
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteConversation(c.id);
+                        }}
+                        className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--rule)]"
+                      >
+                        <Trash2
+                          className="w-3 h-3 text-[var(--ink-muted)]"
+                          strokeWidth={1.5}
+                        />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}

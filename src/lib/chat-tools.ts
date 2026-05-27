@@ -1,7 +1,8 @@
 import { db } from "@/db";
 import { searchHistory } from "@/db";
-import { ideas, memories } from "@/db/schema";
+import { ideas, memories, clients, clientBrief } from "@/db/schema";
 import { getAuthedClient } from "@/lib/integrations/google";
+import { eq } from "drizzle-orm";
 import crypto from "crypto";
 
 export interface ToolDefinition {
@@ -10,7 +11,7 @@ export interface ToolDefinition {
   args: string;
 }
 
-export const TOOL_DEFINITIONS: ToolDefinition[] = [
+const BASE_TOOLS: ToolDefinition[] = [
   {
     name: "calendar_list",
     description: "List upcoming Google Calendar events for the next 7 days",
@@ -23,8 +24,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: "create_idea",
-    description: "Add a new idea for this client",
-    args: "{title: string, body?: string}",
+    description: "Add a new idea for a client",
+    args: "{title: string, body?: string, clientSlug?: string}",
   },
   {
     name: "search_history",
@@ -33,13 +34,27 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: "save_memory",
-    description: "Save a key fact to long-term memory for this client",
+    description: "Save a key fact to long-term memory",
     args: "{fact: string}",
   },
 ];
 
-export function buildToolsPrompt(): string {
-  const toolLines = TOOL_DEFINITIONS.map(
+const GLOBAL_TOOLS: ToolDefinition[] = [
+  {
+    name: "list_clients",
+    description: "List all clients with their details",
+    args: "none",
+  },
+  {
+    name: "get_client_brief",
+    description: "Get a specific client's brief and details",
+    args: "{clientSlug: string}",
+  },
+];
+
+export function buildToolsPrompt(isGlobal = false): string {
+  const tools = isGlobal ? [...GLOBAL_TOOLS, ...BASE_TOOLS] : BASE_TOOLS;
+  const toolLines = tools.map(
     (t) => `- ${t.name}: ${t.description}. Args: ${t.args}`
   ).join("\n");
 
@@ -134,13 +149,22 @@ export async function executeTool(
     }
 
     case "create_idea": {
+      // Resolve clientId from slug if in global mode
+      let targetClientId = clientId;
+      if (clientId === "global" && args.clientSlug) {
+        const c = await db.select().from(clients).where(eq(clients.slug, args.clientSlug as string)).get();
+        if (c) targetClientId = c.id;
+        else return `Client "${args.clientSlug}" not found.`;
+      }
+      if (targetClientId === "global") return "Please specify a clientSlug for this idea.";
+
       const id = crypto.randomUUID();
       const now = new Date().toISOString();
       await db
         .insert(ideas)
         .values({
           id,
-          clientId,
+          clientId: targetClientId,
           title: args.title as string,
           body: (args.body as string) || null,
           column: "raw",
@@ -155,25 +179,42 @@ export async function executeTool(
     case "search_history": {
       const results = await searchHistory(
         args.query as string,
-        clientId
+        clientId === "global" ? "" : clientId
       );
       if (results.length === 0) return "No history entries found.";
       return JSON.stringify(results.slice(0, 10));
     }
 
     case "save_memory": {
-      const id = crypto.randomUUID();
+      const memId = crypto.randomUUID();
       await db
         .insert(memories)
         .values({
-          id,
-          clientId,
+          id: memId,
+          clientId: clientId === "global" ? "global" : clientId,
           fact: args.fact as string,
           sourceConversationId: conversationId,
           createdAt: new Date().toISOString(),
         })
         .run();
       return `Saved to memory: "${args.fact}"`;
+    }
+
+    case "list_clients": {
+      const allClients = await db.select().from(clients).all();
+      return JSON.stringify(allClients.map((c) => ({
+        name: c.name,
+        slug: c.slug,
+        industry: c.industry,
+        stage: c.stage,
+      })));
+    }
+
+    case "get_client_brief": {
+      const c = await db.select().from(clients).where(eq(clients.slug, args.clientSlug as string)).get();
+      if (!c) return `Client "${args.clientSlug}" not found.`;
+      const brief = await db.select().from(clientBrief).where(eq(clientBrief.clientId, c.id)).get();
+      return JSON.stringify({ ...c, brief: brief || null });
     }
 
     default:

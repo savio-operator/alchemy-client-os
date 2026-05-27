@@ -19,6 +19,23 @@ export async function GET(
   return NextResponse.json(msgs);
 }
 
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const body = await request.json();
+  const { title } = body as { title: string };
+
+  await db
+    .update(conversations)
+    .set({ title })
+    .where(eq(conversations.id, id))
+    .run();
+
+  return NextResponse.json({ success: true });
+}
+
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
