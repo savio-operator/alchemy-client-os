@@ -73,13 +73,48 @@ export function AgentDrawer() {
         }
       }
 
+      // Enrich input with client context if on a client page
+      let enrichedInput = userMessage;
+      if (slug && clientId) {
+        try {
+          const [briefRes, ideasRes, campaignsRes] = await Promise.all([
+            fetch(`/api/clients/${slug}`),
+            fetch(`/api/clients/${slug}/ideas`),
+            fetch(`/api/clients/${slug}/campaigns`),
+          ]);
+          const client = briefRes.ok ? await briefRes.json() : null;
+          const ideas = ideasRes.ok ? await ideasRes.json() : [];
+          const campaigns = campaignsRes.ok ? await campaignsRes.json() : [];
+
+          const context = [
+            `--- CLIENT CONTEXT ---`,
+            `Name: ${client?.name || "Unknown"}`,
+            `Industry: ${client?.industry || "N/A"}`,
+            `Stage: ${client?.stage || "N/A"}`,
+            client?.brief?.summaryMd ? `Brief: ${client.brief.summaryMd}` : null,
+            client?.brief?.northStar ? `North Star: ${client.brief.northStar}` : null,
+            client?.brief?.audience ? `Audience: ${client.brief.audience}` : null,
+            client?.brief?.voice ? `Voice: ${client.brief.voice}` : null,
+            ideas.length > 0 ? `Ideas (${ideas.length}): ${ideas.map((i: { title: string }) => i.title).join(", ")}` : null,
+            campaigns.length > 0 ? `Campaigns (${campaigns.length}): ${campaigns.map((c: { type: string; status: string }) => `${c.type} (${c.status})`).join(", ")}` : null,
+            `--- END CONTEXT ---`,
+            ``,
+            `User request: ${userMessage}`,
+          ].filter(Boolean).join("\n");
+
+          enrichedInput = context;
+        } catch {
+          // Fall back to raw input if context fetch fails
+        }
+      }
+
       const res = await fetch("/api/agents/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           agentName: selectedAgent,
           clientId: clientId || "global",
-          input: userMessage,
+          input: enrichedInput,
         }),
       });
 
