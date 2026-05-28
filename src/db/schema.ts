@@ -191,6 +191,80 @@ export const memories = sqliteTable("memories", {
   createdAt: text("created_at").notNull(),
 });
 
+// --- Business tables ---
+
+export const invoices = sqliteTable("invoices", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  number: text("number").notNull(),
+  amount: real("amount").notNull(),
+  currency: text("currency").notNull().default("INR"),
+  status: text("status").notNull().default("draft"), // draft, sent, paid, overdue
+  dueDate: text("due_date"),
+  paidAt: text("paid_at"),
+  description: text("description"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const leads = sqliteTable("leads", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  company: text("company"),
+  email: text("email"),
+  phone: text("phone"),
+  source: text("source"), // referral, inbound, outbound, social
+  status: text("status").notNull().default("new"), // new, contacted, qualified, proposal, won, lost
+  notes: text("notes"),
+  assignedTo: text("assigned_to"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const tasks = sqliteTable("tasks", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id")
+    .references(() => clients.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("todo"), // todo, in_progress, done
+  priority: text("priority").notNull().default("medium"), // low, medium, high, urgent
+  dueDate: text("due_date"),
+  assignedTo: text("assigned_to"),
+  completedAt: text("completed_at"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const notes = sqliteTable("notes", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id")
+    .references(() => clients.id, { onDelete: "cascade" }),
+  title: text("title"),
+  body: text("body").notNull(),
+  tags: text("tags"), // JSON array
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const deliverables = sqliteTable("deliverables", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  campaignId: text("campaign_id")
+    .references(() => campaigns.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  type: text("type"), // design, video, copy, social_post, report
+  status: text("status").notNull().default("pending"), // pending, in_progress, review, delivered
+  fileUrl: text("file_url"),
+  deliveredAt: text("delivered_at"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 // --- Types ---
 
 export type Client = typeof clients.$inferSelect;
@@ -208,3 +282,8 @@ export type Prediction = typeof predictions.$inferSelect;
 export type Conversation = typeof conversations.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Memory = typeof memories.$inferSelect;
+export type Invoice = typeof invoices.$inferSelect;
+export type Lead = typeof leads.$inferSelect;
+export type Task = typeof tasks.$inferSelect;
+export type Note = typeof notes.$inferSelect;
+export type Deliverable = typeof deliverables.$inferSelect;
