@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import Link from "next/link";
 
 export default function LoginPage() {
@@ -84,12 +83,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex-1 flex items-center justify-center px-4">
-      <motion.div
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.22, ease: "easeOut" }}
-        className="w-full max-w-sm"
-      >
+      <div className="w-full max-w-sm animate-panel-in">
         {mode === "migrate" ? (
           <>
             <h1 className="text-2xl font-semibold mb-2 text-center">
@@ -205,7 +199,7 @@ export default function LoginPage() {
             </p>
           </>
         )}
-      </motion.div>
+      </div>
     </div>
   );
 }

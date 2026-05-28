@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { CheckCircle } from "lucide-react";
 
@@ -46,11 +45,7 @@ export default function RegisterPage() {
   if (submitted) {
     return (
       <div className="flex-1 flex items-center justify-center px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-sm text-center"
-        >
+        <div className="w-full max-w-sm text-center animate-panel-in">
           <CheckCircle
             className="w-12 h-12 text-green-500 mx-auto mb-4"
             strokeWidth={1.5}
@@ -66,19 +61,14 @@ export default function RegisterPage() {
           >
             Back to login
           </Link>
-        </motion.div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex-1 flex items-center justify-center px-4">
-      <motion.div
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.22, ease: "easeOut" }}
-        className="w-full max-w-sm"
-      >
+      <div className="w-full max-w-sm animate-panel-in">
         <h1 className="text-2xl font-semibold mb-2 text-center">
           Request access
         </h1>
@@ -157,7 +147,7 @@ export default function RegisterPage() {
             Sign in
           </Link>
         </p>
-      </motion.div>
+      </div>
     </div>
   );
 }
