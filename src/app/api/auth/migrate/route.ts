@@ -6,13 +6,12 @@ import { settings, sessions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function POST(request: Request) {
-  // Only allow migration if PIN exists and no users exist
-  const pinSet = await isPinSet();
+  // Only allow if no users exist (fresh install or PIN migration)
   const usersExist = await hasUsers();
 
-  if (!pinSet || usersExist) {
+  if (usersExist) {
     return NextResponse.json(
-      { error: "Migration not available" },
+      { error: "Setup already complete. Use login instead." },
       { status: 400 }
     );
   }
@@ -54,8 +53,11 @@ export async function POST(request: Request) {
     );
   }
 
-  // Delete old PIN
-  await db.delete(settings).where(eq(settings.key, "pin_hash")).run();
+  // Clean up old PIN if it exists
+  const pinSet = await isPinSet();
+  if (pinSet) {
+    await db.delete(settings).where(eq(settings.key, "pin_hash")).run();
+  }
 
   // Invalidate all old sessions (they have no user_id)
   await db.delete(sessions).run();

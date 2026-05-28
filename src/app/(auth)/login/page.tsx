@@ -96,7 +96,7 @@ export default function LoginPage() {
               Create Founder Account
             </h1>
             <p className="text-[var(--ink-muted)] mb-6 text-sm text-center">
-              Migrating from PIN to multi-user. Set up your founder account.
+              Set up your founder account to get started.
             </p>
             <form onSubmit={handleMigrate} className="space-y-4">
               <div>

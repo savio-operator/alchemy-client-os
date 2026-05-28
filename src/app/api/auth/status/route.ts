@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { validateSession, isPinSet, hasUsers } from "@/lib/auth";
+import { validateSession, hasUsers } from "@/lib/auth";
 
 export async function GET() {
   const { valid, user } = await validateSession();
@@ -16,10 +16,9 @@ export async function GET() {
     });
   }
 
-  // Check if this is a migration scenario (PIN exists but no users yet)
-  const pinSet = await isPinSet();
+  // Check if this is a setup/migration scenario (no users yet)
   const usersExist = await hasUsers();
-  const migration = pinSet && !usersExist;
+  const migration = !usersExist;
 
   return NextResponse.json({
     authenticated: false,
