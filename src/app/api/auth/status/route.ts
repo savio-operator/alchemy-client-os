@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { validateSession, hasUsers } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const { valid, user } = await validateSession();
 
