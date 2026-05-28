@@ -368,6 +368,11 @@ export const db = new Proxy({} as LibSQLDatabase<typeof schema>, {
   },
 });
 
+/** Await this before any db access to ensure tables exist */
+export async function ensureInit() {
+  await initPromise;
+}
+
 // Raw query helpers (async replacements for sqlite.prepare)
 export async function queryOne<T = Record<string, unknown>>(
   sql: string,

@@ -1,4 +1,4 @@
-import { db } from "@/db";
+import { db, initPromise } from "@/db";
 import { sessions, settings, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
@@ -24,6 +24,7 @@ export function verifyPassword(password: string, stored: string): boolean {
 // --- Session management ---
 
 export async function createSession(userId: string): Promise<string> {
+  await initPromise;
   const id = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(
     Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000
@@ -50,6 +51,7 @@ export async function validateSession(): Promise<{
   valid: boolean;
   user: typeof users.$inferSelect | null;
 }> {
+  await initPromise;
   const cookieStore = await cookies();
   const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
   if (!sessionId) return { valid: false, user: null };
@@ -116,6 +118,7 @@ export async function destroySession(): Promise<void> {
 // --- Migration helpers ---
 
 export async function isPinSet(): Promise<boolean> {
+  await initPromise;
   const result = await db
     .select()
     .from(settings)
@@ -125,6 +128,7 @@ export async function isPinSet(): Promise<boolean> {
 }
 
 export async function hasUsers(): Promise<boolean> {
+  await initPromise;
   const result = await db.select().from(users).limit(1).all();
   return result.length > 0;
 }

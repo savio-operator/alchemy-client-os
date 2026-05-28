@@ -2,7 +2,7 @@ services:
   - type: web
     name: adchemy-client-os
     runtime: node
-    buildCommand: pnpm install && pnpm build
+    buildCommand: NODE_OPTIONS="--max-old-space-size=4096" pnpm install && NODE_OPTIONS="--max-old-space-size=4096" pnpm build
     startCommand: pnpm start
     healthCheckPath: /api/health
     disk:
