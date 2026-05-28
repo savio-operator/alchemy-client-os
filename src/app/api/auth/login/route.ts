@@ -1,25 +1,51 @@
 import { NextResponse } from "next/server";
-import { verifyPin, createSession } from "@/lib/auth";
+import { verifyPassword, createSession } from "@/lib/auth";
+import { getUserByEmail } from "@/lib/user";
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { pin } = body as { pin?: string };
+  const { email, password } = body as { email?: string; password?: string };
 
-  if (!pin || !/^\d{6}$/.test(pin)) {
+  if (!email || !password) {
     return NextResponse.json(
-      { error: "PIN must be exactly 6 digits" },
+      { error: "Email and password are required" },
       { status: 400 }
     );
   }
 
-  const valid = await verifyPin(pin);
-  if (!valid) {
+  const user = await getUserByEmail(email);
+  if (!user) {
     return NextResponse.json(
-      { error: "Incorrect PIN" },
+      { error: "Invalid email or password" },
       { status: 401 }
     );
   }
 
-  await createSession();
-  return NextResponse.json({ success: true });
+  if (user.status === "pending") {
+    return NextResponse.json(
+      { error: "Your account is pending approval" },
+      { status: 403 }
+    );
+  }
+
+  if (user.status === "rejected") {
+    return NextResponse.json(
+      { error: "Your account has been rejected" },
+      { status: 403 }
+    );
+  }
+
+  const valid = verifyPassword(password, user.passwordHash);
+  if (!valid) {
+    return NextResponse.json(
+      { error: "Invalid email or password" },
+      { status: 401 }
+    );
+  }
+
+  await createSession(user.id);
+  return NextResponse.json({
+    success: true,
+    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+  });
 }

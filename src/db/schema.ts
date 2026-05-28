@@ -1,5 +1,20 @@
 import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 
+// --- Users & Auth ---
+
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: text("role").notNull().default("member"), // founder, manager, member
+  status: text("status").notNull().default("pending"), // pending, active, rejected
+  avatarUrl: text("avatar_url"),
+  approvedBy: text("approved_by"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 // --- Phase 1 tables ---
 
 export const clients = sqliteTable("clients", {
@@ -32,6 +47,7 @@ export const clientBrief = sqliteTable("client_brief", {
 
 export const sessions = sqliteTable("sessions", {
   id: text("id").primaryKey(),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
   expiresAt: text("expires_at").notNull(),
   createdAt: text("created_at").notNull(),
 });
@@ -267,6 +283,7 @@ export const deliverables = sqliteTable("deliverables", {
 
 // --- Types ---
 
+export type User = typeof users.$inferSelect;
 export type Client = typeof clients.$inferSelect;
 export type NewClient = typeof clients.$inferInsert;
 export type ClientProfile = typeof clientProfile.$inferSelect;

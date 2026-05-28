@@ -26,6 +26,19 @@ async function initTables() {
   const client = getClient();
 
   await client.executeMultiple(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member',
+      status TEXT NOT NULL DEFAULT 'pending',
+      avatar_url TEXT,
+      approved_by TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS clients (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -253,6 +266,13 @@ async function initTables() {
       updated_at TEXT NOT NULL
     );
   `);
+
+  // Add user_id column to sessions (idempotent)
+  try {
+    await client.execute({ sql: "ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE CASCADE", args: [] });
+  } catch {
+    // Column already exists — ignore
+  }
 }
 
 // Ensure tables are initialized before any DB access

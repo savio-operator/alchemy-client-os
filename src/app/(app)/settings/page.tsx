@@ -13,10 +13,15 @@ import {
   Rss,
   Zap,
   LogOut,
+  Users,
+  Check,
+  X,
+  Shield,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useUser } from "@/store/user";
 
 interface Integration {
   provider: string;
@@ -46,8 +51,18 @@ const PROVIDER_INFO: Record<string, { label: string; description: string }> = {
   },
 };
 
+interface TeamUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  createdAt: string;
+}
+
 export default function SettingsPage() {
   const router = useRouter();
+  const { user: currentUser } = useUser();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
   const [polling, setPolling] = useState(false);
@@ -55,6 +70,8 @@ export default function SettingsPage() {
   const [pollResult, setPollResult] = useState<string | null>(null);
   const [scoreResult, setScoreResult] = useState<string | null>(null);
   const [dark, setDark] = useState(false);
+  const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
+  const [teamLoading, setTeamLoading] = useState(false);
 
   useEffect(() => {
     setDark(document.documentElement.classList.contains("dark"));
@@ -65,6 +82,54 @@ export default function SettingsPage() {
         setLoading(false);
       });
   }, []);
+
+  // Load team users for founders
+  useEffect(() => {
+    if (currentUser?.role !== "founder") return;
+    setTeamLoading(true);
+    fetch("/api/users")
+      .then((r) => r.json())
+      .then((data) => {
+        setTeamUsers(Array.isArray(data) ? data : []);
+        setTeamLoading(false);
+      })
+      .catch(() => setTeamLoading(false));
+  }, [currentUser?.role]);
+
+  const handleApprove = async (userId: string, role: string) => {
+    await fetch(`/api/users/${userId}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "approve", role }),
+    });
+    setTeamUsers((prev) =>
+      prev.map((u) =>
+        u.id === userId ? { ...u, status: "active", role } : u
+      )
+    );
+  };
+
+  const handleReject = async (userId: string) => {
+    await fetch(`/api/users/${userId}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reject" }),
+    });
+    setTeamUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, status: "rejected" } : u))
+    );
+  };
+
+  const handleChangeRole = async (userId: string, role: string) => {
+    await fetch(`/api/users/${userId}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "change_role", role }),
+    });
+    setTeamUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, role } : u))
+    );
+  };
 
   const toggleDark = () => {
     const next = !dark;
@@ -285,6 +350,135 @@ export default function SettingsPage() {
           </div>
         )}
       </section>
+
+      {/* Team Management — founders only */}
+      {currentUser?.role === "founder" && (
+        <section className="mb-8">
+          <h2 className="text-sm font-medium mb-3">Team</h2>
+          {teamLoading ? (
+            <div className="flex justify-center py-6">
+              <div className="w-5 h-5 border-2 border-[var(--accent-clay)] border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {/* Pending approvals */}
+              {teamUsers.filter((u) => u.status === "pending").length > 0 && (
+                <div className="rounded-[var(--radius)] border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-4 mb-3">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Shield className="w-4 h-4 text-amber-600" strokeWidth={1.5} />
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                      Pending approvals
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {teamUsers
+                      .filter((u) => u.status === "pending")
+                      .map((u) => (
+                        <div
+                          key={u.id}
+                          className="flex items-center justify-between bg-white dark:bg-[var(--surface)] rounded-[var(--radius-sm)] p-3 border border-[var(--rule)]"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{u.name}</p>
+                            <p className="text-xs text-[var(--ink-muted)]">
+                              {u.email}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1 text-green-600 h-7 text-xs"
+                              onClick={() => handleApprove(u.id, "member")}
+                            >
+                              <Check className="w-3 h-3" strokeWidth={2} />
+                              Member
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1 text-blue-600 h-7 text-xs"
+                              onClick={() => handleApprove(u.id, "manager")}
+                            >
+                              <Check className="w-3 h-3" strokeWidth={2} />
+                              Manager
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1 text-destructive h-7 text-xs"
+                              onClick={() => handleReject(u.id)}
+                            >
+                              <X className="w-3 h-3" strokeWidth={2} />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Active team members */}
+              {teamUsers
+                .filter((u) => u.status === "active")
+                .map((u) => (
+                  <div
+                    key={u.id}
+                    className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-[var(--accent-clay)]/10 flex items-center justify-center">
+                          <span className="text-xs font-medium text-[var(--accent-clay)]">
+                            {u.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .toUpperCase()
+                              .slice(0, 2)}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{u.name}</p>
+                          <p className="text-xs text-[var(--ink-muted)]">
+                            {u.email}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant="secondary"
+                          className={`text-[10px] ${
+                            u.role === "founder"
+                              ? "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300"
+                              : u.role === "manager"
+                              ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                              : ""
+                          }`}
+                        >
+                          {u.role}
+                        </Badge>
+                        {u.id !== currentUser?.id && (
+                          <select
+                            value={u.role}
+                            onChange={(e) =>
+                              handleChangeRole(u.id, e.target.value)
+                            }
+                            className="text-xs h-7 px-2 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--surface)]"
+                          >
+                            <option value="member">Member</option>
+                            <option value="manager">Manager</option>
+                            <option value="founder">Founder</option>
+                          </select>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Sign Out */}
       <section>

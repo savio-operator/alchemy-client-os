@@ -3,21 +3,35 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { Plus, Settings, ChevronLeft, ChevronRight, Briefcase } from "lucide-react";
+import {
+  Plus,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  Briefcase,
+  Users,
+  CalendarCheck,
+} from "lucide-react";
 import { useSidebar } from "@/store/sidebar";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import type { Client } from "@/db/schema";
 
 interface SidebarProps {
   clients: Client[];
+  userRole: "founder" | "manager" | "member";
   onNewClient: () => void;
 }
 
-export function Sidebar({ clients, onNewClient }: SidebarProps) {
+export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
   const { expanded, toggle } = useSidebar();
   const pathname = usePathname();
 
   const activeClients = clients.filter((c) => !c.archivedAt);
+  const isFounder = userRole === "founder";
 
   return (
     <motion.aside
@@ -42,9 +56,12 @@ export function Sidebar({ clients, onNewClient }: SidebarProps) {
           <Tooltip>
             <TooltipTrigger
               className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)] transition-colors duration-120"
-              onClick={() => window.location.href = "/"}
+              onClick={() => (window.location.href = "/")}
             >
-              <Briefcase className="w-4 h-4 text-[var(--ink-muted)]" strokeWidth={1.5} />
+              <Briefcase
+                className="w-4 h-4 text-[var(--ink-muted)]"
+                strokeWidth={1.5}
+              />
             </TooltipTrigger>
             <TooltipContent side="right">Home</TooltipContent>
           </Tooltip>
@@ -55,35 +72,43 @@ export function Sidebar({ clients, onNewClient }: SidebarProps) {
           aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
         >
           {expanded ? (
-            <ChevronLeft className="w-4 h-4 text-[var(--ink-muted)]" strokeWidth={1.5} />
+            <ChevronLeft
+              className="w-4 h-4 text-[var(--ink-muted)]"
+              strokeWidth={1.5}
+            />
           ) : (
-            <ChevronRight className="w-4 h-4 text-[var(--ink-muted)]" strokeWidth={1.5} />
+            <ChevronRight
+              className="w-4 h-4 text-[var(--ink-muted)]"
+              strokeWidth={1.5}
+            />
           )}
         </button>
       </div>
 
-      {/* New client button */}
-      <div className="px-3 mb-2">
-        {!expanded ? (
-          <Tooltip>
-            <TooltipTrigger
+      {/* New client button — founders only */}
+      {isFounder && (
+        <div className="px-3 mb-2">
+          {!expanded ? (
+            <Tooltip>
+              <TooltipTrigger
+                onClick={onNewClient}
+                className="w-full flex items-center gap-2 h-9 px-2 rounded-[var(--radius-sm)] text-sm font-medium text-[var(--accent-clay)] hover:bg-[var(--accent-clay)]/8 transition-colors duration-120"
+              >
+                <Plus className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+              </TooltipTrigger>
+              <TooltipContent side="right">New client</TooltipContent>
+            </Tooltip>
+          ) : (
+            <button
               onClick={onNewClient}
               className="w-full flex items-center gap-2 h-9 px-2 rounded-[var(--radius-sm)] text-sm font-medium text-[var(--accent-clay)] hover:bg-[var(--accent-clay)]/8 transition-colors duration-120"
             >
               <Plus className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-            </TooltipTrigger>
-            <TooltipContent side="right">New client</TooltipContent>
-          </Tooltip>
-        ) : (
-          <button
-            onClick={onNewClient}
-            className="w-full flex items-center gap-2 h-9 px-2 rounded-[var(--radius-sm)] text-sm font-medium text-[var(--accent-clay)] hover:bg-[var(--accent-clay)]/8 transition-colors duration-120"
-          >
-            <Plus className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-            <span>New client</span>
-          </button>
-        )}
-      </div>
+              <span>New client</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Client list */}
       <nav className="flex-1 overflow-y-auto px-3 space-y-0.5">
@@ -100,9 +125,12 @@ export function Sidebar({ clients, onNewClient }: SidebarProps) {
                       ? "bg-[var(--muted)] font-medium"
                       : "hover:bg-[var(--muted)] text-[var(--ink-muted)]"
                   }`}
-                  onClick={() => window.location.href = href}
+                  onClick={() => (window.location.href = href)}
                 >
-                  <Briefcase className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+                  <Briefcase
+                    className="w-4 h-4 shrink-0"
+                    strokeWidth={1.5}
+                  />
                 </TooltipTrigger>
                 <TooltipContent side="right">{client.name}</TooltipContent>
               </Tooltip>
@@ -127,33 +155,88 @@ export function Sidebar({ clients, onNewClient }: SidebarProps) {
 
         {activeClients.length === 0 && expanded && (
           <p className="text-xs text-[var(--ink-muted)] px-2 py-4">
-            No clients yet. Create your first project.
+            No clients yet.
           </p>
         )}
       </nav>
 
-      {/* Settings */}
-      <div className="p-3 border-t border-[var(--rule)]">
-        {!expanded ? (
-          <Tooltip>
-            <TooltipTrigger
-              className="w-full flex items-center gap-2 h-9 px-2 rounded-[var(--radius-sm)] text-sm text-[var(--ink-muted)] hover:bg-[var(--muted)] transition-colors duration-120"
-              onClick={() => window.location.href = "/settings"}
-            >
-              <Settings className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-            </TooltipTrigger>
-            <TooltipContent side="right">Settings</TooltipContent>
-          </Tooltip>
-        ) : (
-          <Link
-            href="/settings"
-            className="flex items-center gap-2 h-9 px-2 rounded-[var(--radius-sm)] text-sm text-[var(--ink-muted)] hover:bg-[var(--muted)] transition-colors duration-120"
-          >
-            <Settings className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-            <span>Settings</span>
-          </Link>
+      {/* Bottom nav */}
+      <div className="p-3 border-t border-[var(--rule)] space-y-0.5">
+        {/* Attendance — all roles */}
+        <SidebarLink
+          href="/attendance"
+          icon={CalendarCheck}
+          label="Attendance"
+          expanded={expanded}
+          active={pathname === "/attendance"}
+        />
+
+        {/* Team — founders only */}
+        {isFounder && (
+          <SidebarLink
+            href="/settings?tab=team"
+            icon={Users}
+            label="Team"
+            expanded={expanded}
+            active={false}
+          />
         )}
+
+        {/* Settings */}
+        <SidebarLink
+          href="/settings"
+          icon={Settings}
+          label="Settings"
+          expanded={expanded}
+          active={pathname === "/settings"}
+        />
       </div>
     </motion.aside>
+  );
+}
+
+function SidebarLink({
+  href,
+  icon: Icon,
+  label,
+  expanded,
+  active,
+}: {
+  href: string;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  label: string;
+  expanded: boolean;
+  active: boolean;
+}) {
+  if (!expanded) {
+    return (
+      <Tooltip>
+        <TooltipTrigger
+          className={`w-full flex items-center gap-2 h-9 px-2 rounded-[var(--radius-sm)] text-sm transition-colors duration-120 ${
+            active
+              ? "bg-[var(--muted)] font-medium"
+              : "text-[var(--ink-muted)] hover:bg-[var(--muted)]"
+          }`}
+          onClick={() => (window.location.href = href)}
+        >
+          <Icon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+        </TooltipTrigger>
+        <TooltipContent side="right">{label}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className={`flex items-center gap-2 h-9 px-2 rounded-[var(--radius-sm)] text-sm transition-colors duration-120 ${
+        active
+          ? "bg-[var(--muted)] font-medium"
+          : "text-[var(--ink-muted)] hover:bg-[var(--muted)]"
+      }`}
+    >
+      <Icon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+      <span>{label}</span>
+    </Link>
   );
 }

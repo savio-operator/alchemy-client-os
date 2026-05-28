@@ -7,10 +7,23 @@ import {
   Lightbulb,
   Compass,
   Clock,
+  CheckSquare,
+  Receipt,
 } from "lucide-react";
 import { db, initPromise } from "@/db";
-import { clients, campaigns, ideas, discoveries, historyEntries } from "@/db/schema";
+import {
+  clients,
+  campaigns,
+  ideas,
+  discoveries,
+  historyEntries,
+  tasks,
+  invoices,
+  leads,
+} from "@/db/schema";
 import { eq, count, desc } from "drizzle-orm";
+import { getCurrentUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -21,6 +34,12 @@ function getGreeting(): string {
 
 export default async function HomePage() {
   await initPromise;
+
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const isFounder = user.role === "founder";
+  const isManager = user.role === "manager";
 
   // Fetch stats
   const [allClients, activeCampaignCount, ideasCount, discoveriesCount] =
@@ -36,6 +55,24 @@ export default async function HomePage() {
 
   const activeClients = allClients.filter((c) => !c.archivedAt);
 
+  // Extra stats for founders
+  const [taskCount, pendingInvoices, leadCount] = isFounder
+    ? await Promise.all([
+        db
+          .select({ value: count() })
+          .from(tasks)
+          .where(eq(tasks.status, "todo")),
+        db
+          .select({ value: count() })
+          .from(invoices)
+          .where(eq(invoices.status, "sent")),
+        db
+          .select({ value: count() })
+          .from(leads)
+          .where(eq(leads.status, "new")),
+      ])
+    : [null, null, null];
+
   // Recent activity — last 5 history entries across all clients
   const recentActivity = await db
     .select({
@@ -49,15 +86,10 @@ export default async function HomePage() {
     .orderBy(desc(historyEntries.createdAt))
     .limit(5);
 
-  // Map client IDs to names for the activity feed
   const clientMap = new Map(allClients.map((c) => [c.id, c]));
 
   const stats = [
-    {
-      label: "Clients",
-      value: activeClients.length,
-      icon: Users,
-    },
+    { label: "Clients", value: activeClients.length, icon: Users },
     {
       label: "Active campaigns",
       value: activeCampaignCount[0]?.value ?? 0,
@@ -68,25 +100,49 @@ export default async function HomePage() {
       value: ideasCount[0]?.value ?? 0,
       icon: Lightbulb,
     },
-    {
-      label: "Discoveries",
-      value: discoveriesCount[0]?.value ?? 0,
-      icon: Compass,
-    },
+    ...(isFounder
+      ? [
+          {
+            label: "Open tasks",
+            value: taskCount?.[0]?.value ?? 0,
+            icon: CheckSquare,
+          },
+          {
+            label: "Pending invoices",
+            value: pendingInvoices?.[0]?.value ?? 0,
+            icon: Receipt,
+          },
+          {
+            label: "New leads",
+            value: leadCount?.[0]?.value ?? 0,
+            icon: Compass,
+          },
+        ]
+      : [
+          {
+            label: "Discoveries",
+            value: discoveriesCount[0]?.value ?? 0,
+            icon: Compass,
+          },
+        ]),
   ];
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-10">
       {/* Greeting */}
       <h1 className="text-3xl font-serif font-semibold mb-1">
-        {getGreeting()}
+        {getGreeting()}, {user.name.split(" ")[0]}
       </h1>
       <p className="text-[var(--ink-muted)] mb-8">
-        Here is what is happening across your clients.
+        {isFounder
+          ? "Here is what is happening across your clients."
+          : isManager
+          ? "Here is your team overview."
+          : "Here is what you have today."}
       </p>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-10">
         {stats.map((stat) => (
           <div
             key={stat.label}
@@ -106,8 +162,8 @@ export default async function HomePage() {
         ))}
       </div>
 
-      {/* Recent activity */}
-      {recentActivity.length > 0 && (
+      {/* Recent activity — founders and managers */}
+      {(isFounder || isManager) && recentActivity.length > 0 && (
         <section className="mb-10">
           <h2 className="text-sm font-medium text-[var(--ink-muted)] uppercase tracking-wide mb-3">
             Recent activity
@@ -116,17 +172,23 @@ export default async function HomePage() {
             {recentActivity.map((entry) => {
               const client = clientMap.get(entry.clientId);
               return (
-                <div key={entry.id} className="flex items-center gap-3 px-4 py-3">
+                <div
+                  key={entry.id}
+                  className="flex items-center gap-3 px-4 py-3"
+                >
                   <Clock
                     className="w-4 h-4 text-[var(--ink-muted)] shrink-0"
                     strokeWidth={1.5}
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm truncate">
-                      <span className="font-medium">{entry.title || entry.type}</span>
+                      <span className="font-medium">
+                        {entry.title || entry.type}
+                      </span>
                       {client && (
                         <span className="text-[var(--ink-muted)]">
-                          {" "}— {client.name}
+                          {" "}
+                          — {client.name}
                         </span>
                       )}
                     </p>
@@ -157,7 +219,9 @@ export default async function HomePage() {
             </div>
             <p className="text-sm font-medium mb-1">No clients yet</p>
             <p className="text-xs text-[var(--ink-muted)]">
-              Create your first client project to get started.
+              {isFounder
+                ? "Create your first client project to get started."
+                : "No clients have been assigned to you yet."}
             </p>
           </div>
         ) : (
@@ -176,9 +240,12 @@ export default async function HomePage() {
                     />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{client.name}</p>
+                    <p className="text-sm font-medium truncate">
+                      {client.name}
+                    </p>
                     <p className="text-xs text-[var(--ink-muted)] truncate">
-                      {client.industry || "No industry"} · {client.stage || "No stage"}
+                      {client.industry || "No industry"} ·{" "}
+                      {client.stage || "No stage"}
                     </p>
                   </div>
                 </div>

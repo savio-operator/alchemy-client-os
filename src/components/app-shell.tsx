@@ -7,6 +7,7 @@ import { TopBar } from "@/components/top-bar";
 import { AgentDrawer } from "@/components/agent-drawer";
 import { CommandPalette } from "@/components/command-palette";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
+import { useUser } from "@/store/user";
 import type { Client } from "@/db/schema";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -14,6 +15,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+  const { user, setUser } = useUser();
+
+  // Fetch current user
+  useEffect(() => {
+    fetch("/api/auth/status")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.authenticated && data.user) {
+          setUser(data.user);
+        } else {
+          router.replace("/login");
+        }
+      });
+  }, [setUser, router]);
 
   const fetchClients = () => {
     fetch("/api/clients")
@@ -22,8 +37,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    fetchClients();
-  }, []);
+    if (user) fetchClients();
+  }, [user]);
 
   const breadcrumbs = buildBreadcrumbs(pathname, clients);
 
@@ -31,11 +46,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex h-screen overflow-hidden">
       <Sidebar
         clients={clients}
+        userRole={user?.role || "member"}
         onNewClient={() => setShowOnboarding(true)}
       />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <TopBar breadcrumbs={breadcrumbs} />
+        <TopBar breadcrumbs={breadcrumbs} userName={user?.name} />
 
         <main className="flex-1 overflow-y-auto">
           <div className="animate-panel-in">{children}</div>
@@ -49,7 +65,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         onNewClient={() => setShowOnboarding(true)}
       />
 
-      {showOnboarding && (
+      {showOnboarding && user?.role === "founder" && (
         <OnboardingWizard
           onClose={() => setShowOnboarding(false)}
           onCreated={(slug) => {
