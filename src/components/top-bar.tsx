@@ -90,6 +90,7 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
 
         {/* Notifications */}
         <button
+          onClick={() => router.push("/settings")}
           className="relative w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)] transition-colors duration-120"
           aria-label="Notifications"
         >

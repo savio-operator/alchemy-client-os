@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { approveUser, rejectUser, getUserById, updateUserRole } from "@/lib/user";
+import { notifyUser } from "@/lib/notifications";
 import type { UserRole } from "@/lib/user";
 
 export async function POST(
@@ -28,6 +29,7 @@ export async function POST(
     case "approve": {
       const assignRole = role || "member";
       const updated = await approveUser(id, assignRole, currentUser.id);
+      await notifyUser(id, "registration_request", "Your account has been approved", `You have been approved as ${assignRole}. Welcome to the team.`);
       return NextResponse.json(updated);
     }
     case "reject": {

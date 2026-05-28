@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
@@ -11,6 +12,7 @@ import {
   Briefcase,
   Users,
   CalendarCheck,
+  MessageSquare,
 } from "lucide-react";
 import { useSidebar } from "@/store/sidebar";
 import {
@@ -29,9 +31,23 @@ interface SidebarProps {
 export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
   const { expanded, toggle } = useSidebar();
   const pathname = usePathname();
+  const [updateCounts, setUpdateCounts] = useState<Record<string, number>>({});
 
   const activeClients = clients.filter((c) => !c.archivedAt);
   const isFounder = userRole === "founder";
+
+  // Poll for update badges
+  useEffect(() => {
+    const poll = () => {
+      fetch("/api/updates")
+        .then((r) => r.json())
+        .then((data) => setUpdateCounts(data))
+        .catch(() => {});
+    };
+    poll();
+    const interval = setInterval(poll, 60_000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <motion.aside
@@ -162,6 +178,16 @@ export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
 
       {/* Bottom nav */}
       <div className="p-3 border-t border-[var(--rule)] space-y-0.5">
+        {/* Team Chat */}
+        <SidebarLink
+          href="/chat"
+          icon={MessageSquare}
+          label="Chat"
+          expanded={expanded}
+          active={pathname === "/chat"}
+          badge={updateCounts.chat}
+        />
+
         {/* Attendance — all roles */}
         <SidebarLink
           href="/attendance"
@@ -201,18 +227,20 @@ function SidebarLink({
   label,
   expanded,
   active,
+  badge,
 }: {
   href: string;
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   label: string;
   expanded: boolean;
   active: boolean;
+  badge?: number;
 }) {
   if (!expanded) {
     return (
       <Tooltip>
         <TooltipTrigger
-          className={`w-full flex items-center gap-2 h-9 px-2 rounded-[var(--radius-sm)] text-sm transition-colors duration-120 ${
+          className={`relative w-full flex items-center gap-2 h-9 px-2 rounded-[var(--radius-sm)] text-sm transition-colors duration-120 ${
             active
               ? "bg-[var(--muted)] font-medium"
               : "text-[var(--ink-muted)] hover:bg-[var(--muted)]"
@@ -220,6 +248,9 @@ function SidebarLink({
           onClick={() => (window.location.href = href)}
         >
           <Icon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+          {badge != null && badge > 0 && (
+            <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-[var(--accent-clay)]" />
+          )}
         </TooltipTrigger>
         <TooltipContent side="right">{label}</TooltipContent>
       </Tooltip>
@@ -236,7 +267,12 @@ function SidebarLink({
       }`}
     >
       <Icon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-      <span>{label}</span>
+      <span className="flex-1">{label}</span>
+      {badge != null && badge > 0 && (
+        <span className="w-5 h-5 bg-[var(--accent-clay)] text-white text-[10px] font-medium rounded-full flex items-center justify-center">
+          {badge > 9 ? "9+" : badge}
+        </span>
+      )}
     </Link>
   );
 }

@@ -25,8 +25,8 @@ function getOAuth2Client() {
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
-export async function getAuthedClient() {
-  const tokens = await getIntegrationTokens("google");
+export async function getAuthedClient(userId?: string) {
+  const tokens = await getIntegrationTokens("google", userId);
   if (!tokens) throw new Error("Google not connected");
 
   const client = getOAuth2Client();
@@ -40,7 +40,7 @@ export async function getAuthedClient() {
 
   // Auto-refresh handler
   client.on("tokens", async (newTokens) => {
-    const existing = await getIntegrationTokens("google");
+    const existing = await getIntegrationTokens("google", userId);
     await saveIntegrationTokens("google", {
       accessToken: newTokens.access_token || existing?.accessToken || "",
       refreshToken:
@@ -49,7 +49,7 @@ export async function getAuthedClient() {
         ? new Date(newTokens.expiry_date).toISOString()
         : existing?.expiresAt,
       scope: existing?.scope,
-    });
+    }, userId);
   });
 
   return client;
@@ -57,9 +57,13 @@ export async function getAuthedClient() {
 
 // --- OAuth ---
 
-export function getGoogleOAuthUrl(): { url: string; state: string } {
+export function getGoogleOAuthUrl(userId?: string): { url: string; state: string } {
   const client = getOAuth2Client();
-  const state = crypto.randomBytes(16).toString("hex");
+  // Embed userId in state so callback can save per-user tokens
+  const statePayload = userId
+    ? JSON.stringify({ nonce: crypto.randomBytes(16).toString("hex"), userId })
+    : crypto.randomBytes(16).toString("hex");
+  const state = Buffer.from(statePayload).toString("base64url");
 
   const url = client.generateAuthUrl({
     access_type: "offline",
@@ -71,7 +75,17 @@ export function getGoogleOAuthUrl(): { url: string; state: string } {
   return { url, state };
 }
 
-export async function exchangeGoogleCode(code: string): Promise<void> {
+export function parseOAuthState(state: string): { userId?: string } {
+  try {
+    const decoded = Buffer.from(state, "base64url").toString();
+    const parsed = JSON.parse(decoded);
+    return { userId: parsed.userId };
+  } catch {
+    return {};
+  }
+}
+
+export async function exchangeGoogleCode(code: string, userId?: string): Promise<void> {
   const client = getOAuth2Client();
   const { tokens } = await client.getToken(code);
 
@@ -82,7 +96,7 @@ export async function exchangeGoogleCode(code: string): Promise<void> {
       ? new Date(tokens.expiry_date).toISOString()
       : undefined,
     scope: SCOPES.join(","),
-  });
+  }, userId);
 }
 
 // --- Google Analytics 4 ---

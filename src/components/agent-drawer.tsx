@@ -484,6 +484,9 @@ export function AgentDrawer() {
                 <p className="text-[10px] text-[var(--ink-muted)] mt-1">
                   Cmd+Enter to send · Cmd+J to toggle
                 </p>
+                <p className="text-[9px] text-[var(--ink-muted)] mt-0.5 opacity-60">
+                  AI can make mistakes, please double check the response.
+                </p>
               </div>
             </>
           )}

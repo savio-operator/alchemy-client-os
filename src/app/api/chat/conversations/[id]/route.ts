@@ -1,13 +1,23 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { conversations, messages } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { id } = await params;
+
+  // Verify ownership
+  const conv = await db.select().from(conversations).where(eq(conversations.id, id)).get();
+  if (conv && conv.userId && conv.userId !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const msgs = await db
     .select()

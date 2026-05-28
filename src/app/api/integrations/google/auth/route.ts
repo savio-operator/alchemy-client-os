@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { getGoogleOAuthUrl } from "@/lib/integrations/google";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function GET() {
   try {
-    const { url } = getGoogleOAuthUrl();
+    const user = await getCurrentUser();
+    const { url } = getGoogleOAuthUrl(user?.id);
     return NextResponse.redirect(url);
   } catch (error) {
     const msg =

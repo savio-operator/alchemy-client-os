@@ -181,6 +181,7 @@ export const conversations = sqliteTable("conversations", {
   clientId: text("client_id")
     .notNull()
     .references(() => clients.id, { onDelete: "cascade" }),
+  userId: text("user_id"),
   title: text("title"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
@@ -202,9 +203,94 @@ export const memories = sqliteTable("memories", {
   clientId: text("client_id")
     .notNull()
     .references(() => clients.id, { onDelete: "cascade" }),
+  userId: text("user_id"),
   fact: text("fact").notNull(),
   sourceConversationId: text("source_conversation_id"),
   createdAt: text("created_at").notNull(),
+});
+
+// --- Notifications & Attendance ---
+
+export const notifications = sqliteTable("notifications", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // registration_request, task_assigned, chat_message, reminder
+  title: text("title").notNull(),
+  body: text("body"),
+  link: text("link"),
+  isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull(),
+});
+
+export const attendance = sqliteTable("attendance", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  date: text("date").notNull(), // YYYY-MM-DD
+  markedAt: text("marked_at").notNull(),
+});
+
+// --- Client Access Control ---
+
+export const userClientAccess = sqliteTable("user_client_access", {
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  accessLevel: text("access_level").notNull().default("view"), // view, manage, full
+  assignedBy: text("assigned_by"),
+  createdAt: text("created_at").notNull(),
+});
+
+// --- Team Chat ---
+
+export const chatChannels = sqliteTable("chat_channels", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(), // group, direct
+  name: text("name"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const chatChannelMembers = sqliteTable("chat_channel_members", {
+  channelId: text("channel_id")
+    .notNull()
+    .references(() => chatChannels.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  joinedAt: text("joined_at").notNull(),
+  lastReadAt: text("last_read_at"),
+});
+
+export const chatMessages = sqliteTable("chat_messages", {
+  id: text("id").primaryKey(),
+  channelId: text("channel_id")
+    .notNull()
+    .references(() => chatChannels.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  mediaUrl: text("media_url"),
+  mediaType: text("media_type"), // image, video
+  mediaExpiresAt: text("media_expires_at"),
+  replyToId: text("reply_to_id"),
+  createdAt: text("created_at").notNull(),
+});
+
+// --- Update Tracking ---
+
+export const userSectionVisits = sqliteTable("user_section_visits", {
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  section: text("section").notNull(), // chat, tasks, notifications, attendance
+  lastVisitedAt: text("last_visited_at").notNull(),
 });
 
 // --- Business tables ---
@@ -299,6 +385,10 @@ export type Prediction = typeof predictions.$inferSelect;
 export type Conversation = typeof conversations.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Memory = typeof memories.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
+export type Attendance = typeof attendance.$inferSelect;
+export type ChatChannel = typeof chatChannels.$inferSelect;
+export type ChatMessage = typeof chatMessages.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type Lead = typeof leads.$inferSelect;
 export type Task = typeof tasks.$inferSelect;

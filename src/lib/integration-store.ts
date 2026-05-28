@@ -47,13 +47,19 @@ export interface IntegrationTokens {
   extra?: Record<string, string>;
 }
 
+function tokenKey(provider: string, userId?: string): string {
+  return userId ? `integration:${provider}:${userId}` : `integration:${provider}`;
+}
+
 export async function saveIntegrationTokens(
   provider: string,
-  tokens: IntegrationTokens
+  tokens: IntegrationTokens,
+  userId?: string
 ): Promise<void> {
+  const key = tokenKey(provider, userId);
   const encrypted = encrypt(JSON.stringify(tokens));
   await db.insert(settings)
-    .values({ key: `integration:${provider}`, value: encrypted })
+    .values({ key, value: encrypted })
     .onConflictDoUpdate({
       target: settings.key,
       set: { value: encrypted },
@@ -62,31 +68,42 @@ export async function saveIntegrationTokens(
 }
 
 export async function getIntegrationTokens(
-  provider: string
+  provider: string,
+  userId?: string
 ): Promise<IntegrationTokens | null> {
-  const row = await db
-    .select()
-    .from(settings)
-    .where(eq(settings.key, `integration:${provider}`))
-    .get();
+  // Try per-user key first, then fall back to global key
+  const keys = userId
+    ? [tokenKey(provider, userId), tokenKey(provider)]
+    : [tokenKey(provider)];
 
-  if (!row) return null;
+  for (const key of keys) {
+    const row = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, key))
+      .get();
 
-  try {
-    return JSON.parse(decrypt(row.value));
-  } catch {
-    return null;
+    if (row) {
+      try {
+        return JSON.parse(decrypt(row.value));
+      } catch {
+        continue;
+      }
+    }
   }
+
+  return null;
 }
 
-export async function deleteIntegrationTokens(provider: string): Promise<void> {
+export async function deleteIntegrationTokens(provider: string, userId?: string): Promise<void> {
+  const key = tokenKey(provider, userId);
   await db.delete(settings)
-    .where(eq(settings.key, `integration:${provider}`))
+    .where(eq(settings.key, key))
     .run();
 }
 
-export async function isIntegrationConnected(provider: string): Promise<boolean> {
-  const tokens = await getIntegrationTokens(provider);
+export async function isIntegrationConnected(provider: string, userId?: string): Promise<boolean> {
+  const tokens = await getIntegrationTokens(provider, userId);
   if (!tokens) return false;
   if (tokens.expiresAt && new Date(tokens.expiresAt) < new Date()) {
     return false;

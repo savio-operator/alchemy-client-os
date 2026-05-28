@@ -108,5 +108,13 @@ function buildBreadcrumbs(
     return [{ label: "Settings" }];
   }
 
+  if (segments[0] === "attendance") {
+    return [{ label: "Attendance" }];
+  }
+
+  if (segments[0] === "chat") {
+    return [{ label: "Team Chat" }];
+  }
+
   return [{ label: "Home" }];
 }

@@ -265,13 +265,84 @@ async function initTables() {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT,
+      link TEXT,
+      is_read INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS attendance (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
+      marked_at TEXT NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_user_date
+      ON attendance(user_id, date);
+
+    CREATE TABLE IF NOT EXISTS user_client_access (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      access_level TEXT NOT NULL DEFAULT 'view',
+      assigned_by TEXT,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, client_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_channels (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      name TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_channel_members (
+      channel_id TEXT NOT NULL REFERENCES chat_channels(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      joined_at TEXT NOT NULL,
+      last_read_at TEXT,
+      PRIMARY KEY (channel_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      channel_id TEXT NOT NULL REFERENCES chat_channels(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      media_url TEXT,
+      media_type TEXT,
+      media_expires_at TEXT,
+      reply_to_id TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS user_section_visits (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      section TEXT NOT NULL,
+      last_visited_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, section)
+    );
   `);
 
-  // Add user_id column to sessions (idempotent)
-  try {
-    await client.execute({ sql: "ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE CASCADE", args: [] });
-  } catch {
-    // Column already exists — ignore
+  // Idempotent ALTER TABLE statements for new columns
+  const alters = [
+    "ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE CASCADE",
+    "ALTER TABLE conversations ADD COLUMN user_id TEXT",
+    "ALTER TABLE memories ADD COLUMN user_id TEXT",
+  ];
+  for (const sql of alters) {
+    try {
+      await client.execute({ sql, args: [] });
+    } catch {
+      // Column already exists — ignore
+    }
   }
 }
 

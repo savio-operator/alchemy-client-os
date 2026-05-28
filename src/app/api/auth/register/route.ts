@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserByEmail, createUser } from "@/lib/user";
+import { notifyFounders } from "@/lib/notifications";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -32,6 +33,14 @@ export async function POST(request: Request) {
   }
 
   await createUser(name.trim(), email.trim(), password, "member", "pending");
+
+  // Notify all founders about the new registration
+  await notifyFounders(
+    "registration_request",
+    `${name.trim()} requested to join`,
+    `${email.trim()} wants to join the team.`,
+    "/settings?tab=team"
+  );
 
   return NextResponse.json({
     success: true,

@@ -62,6 +62,12 @@ function buildSystemPrompt(
 }
 
 export async function POST(request: Request) {
+  const { getCurrentUser } = await import("@/lib/auth");
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json();
   const { clientId, conversationId, message } = body as {
     clientId: string;
@@ -78,7 +84,7 @@ export async function POST(request: Request) {
     const title = message.slice(0, 60) + (message.length > 60 ? "..." : "");
     await db
       .insert(conversations)
-      .values({ id: convId, clientId, title, createdAt: now, updatedAt: now })
+      .values({ id: convId, clientId, userId: user.id, title, createdAt: now, updatedAt: now })
       .run();
   }
 

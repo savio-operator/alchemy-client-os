@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { exchangeGoogleCode } from "@/lib/integrations/google";
+import { exchangeGoogleCode, parseOAuthState } from "@/lib/integrations/google";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
+  const state = url.searchParams.get("state");
   const error = url.searchParams.get("error");
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -20,7 +21,9 @@ export async function GET(request: Request) {
   }
 
   try {
-    await exchangeGoogleCode(code);
+    // Extract userId from OAuth state for per-user token storage
+    const { userId } = state ? parseOAuthState(state) : { userId: undefined };
+    await exchangeGoogleCode(code, userId);
     return NextResponse.redirect(new URL("/settings?connected=google", appUrl));
   } catch (err) {
     const msg =
