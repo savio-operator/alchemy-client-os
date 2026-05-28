@@ -1,4 +1,4 @@
-import { db } from "@/db";
+import { db, initPromise } from "@/db";
 import { notifications, users } from "@/db/schema";
 import { eq, and, count } from "drizzle-orm";
 import crypto from "crypto";
@@ -10,6 +10,7 @@ export async function createNotification(
   body?: string,
   link?: string
 ) {
+  await initPromise;
   await db
     .insert(notifications)
     .values({
@@ -26,6 +27,7 @@ export async function createNotification(
 }
 
 export async function getUnreadCount(userId: string): Promise<number> {
+  await initPromise;
   const result = await db
     .select({ value: count() })
     .from(notifications)
@@ -35,6 +37,7 @@ export async function getUnreadCount(userId: string): Promise<number> {
 }
 
 export async function notifyFounders(type: string, title: string, body?: string, link?: string) {
+  await initPromise;
   const founders = await db
     .select()
     .from(users)

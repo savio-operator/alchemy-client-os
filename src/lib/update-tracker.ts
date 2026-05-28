@@ -1,8 +1,9 @@
-import { db } from "@/db";
+import { db, initPromise } from "@/db";
 import { userSectionVisits, notifications, chatMessages, chatChannelMembers } from "@/db/schema";
 import { eq, and, gt, count } from "drizzle-orm";
 
 export async function trackSectionVisit(userId: string, section: string) {
+  await initPromise;
   const now = new Date().toISOString();
   // Upsert
   try {
@@ -25,6 +26,7 @@ export async function trackSectionVisit(userId: string, section: string) {
 }
 
 export async function getLastVisit(userId: string, section: string): Promise<string | null> {
+  await initPromise;
   const row = await db
     .select()
     .from(userSectionVisits)
