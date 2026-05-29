@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
-import { isPinSet, hasUsers, createSession } from "@/lib/auth";
+import { hasUsers, createSession, hashPassword } from "@/lib/auth";
 import { createUser } from "@/lib/user";
-import { db } from "@/db";
-import { settings, sessions } from "@/db/schema";
-import { eq } from "drizzle-orm";
 
 export async function POST(request: Request) {
-  // Only allow if no users exist (fresh install or PIN migration)
   const usersExist = await hasUsers();
 
   if (usersExist) {
@@ -17,31 +13,27 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { name, email, password } = body as {
-    name?: string;
-    email?: string;
-    password?: string;
-  };
+  const { name, pin } = body as { name?: string; pin?: string };
 
-  if (!name || !email || !password) {
+  if (!name || !pin) {
     return NextResponse.json(
-      { error: "Name, email, and password are required" },
+      { error: "Name and PIN are required" },
       { status: 400 }
     );
   }
 
-  if (password.length < 6) {
+  if (pin.length < 4 || pin.length > 8) {
     return NextResponse.json(
-      { error: "Password must be at least 6 characters" },
+      { error: "PIN must be 4-8 digits" },
       { status: 400 }
     );
   }
 
-  // Create founder account
+  // Create founder account with PIN as password (no email needed for first user)
   const user = await createUser(
     name.trim(),
-    email.trim(),
-    password,
+    `founder@adchemy.local`,
+    pin,
     "founder",
     "active"
   );
@@ -53,20 +45,11 @@ export async function POST(request: Request) {
     );
   }
 
-  // Clean up old PIN if it exists
-  const pinSet = await isPinSet();
-  if (pinSet) {
-    await db.delete(settings).where(eq(settings.key, "pin_hash")).run();
-  }
-
-  // Invalidate all old sessions (they have no user_id)
-  await db.delete(sessions).run();
-
-  // Create new session for the founder
+  // Create session for the founder
   await createSession(user.id);
 
   return NextResponse.json({
     success: true,
-    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    user: { id: user.id, name: user.name, role: user.role },
   });
 }
