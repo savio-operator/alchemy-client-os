@@ -13,7 +13,19 @@
       "Bash(ls src/lib/integrations/google*)",
       "Bash(gh auth:*)",
       "Bash(git config:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git remote:*)",
+      "Bash(git push:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(ls /Users/admin/adchemy/adchemy-client-os/src/lib/db* /Users/admin/adchemy/adchemy-client-os/src/lib/database*)",
+      "Bash(git show:*)",
+      "Bash(git reset:*)",
+      "Bash(git checkout:*)",
+      "Bash(git rm:*)",
+      "Bash(pkill -f \"next build\")",
+      "Bash(curl -s -X POST -H \"Authorization: Bearer rnd_URtcBBEIBjM5p2KYTL3TjbBZdQCz\" -H \"Content-Type: application/json\" -d '{\"clearCache\":\"do_not_clear\"}' \"https://api.render.com/v1/services/srv-d8aac2q8qa3s73em74u0/deploys\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f\\\\\"Deploy {d['id']}: {d['status']}\\\\\"\\)\")",
+      "Bash(git commit:*)"
     ]
   }
 }
