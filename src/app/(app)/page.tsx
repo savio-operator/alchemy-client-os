@@ -89,16 +89,18 @@ export default async function HomePage() {
   const clientMap = new Map(allClients.map((c) => [c.id, c]));
 
   const stats = [
-    { label: "Clients", value: activeClients.length, icon: Users },
+    { label: "Clients", value: activeClients.length, icon: Users, href: "#clients" },
     {
       label: "Active campaigns",
       value: activeCampaignCount[0]?.value ?? 0,
       icon: Megaphone,
+      href: activeClients[0] ? `/clients/${activeClients[0].slug}` : null,
     },
     {
       label: "Ideas",
       value: ideasCount[0]?.value ?? 0,
       icon: Lightbulb,
+      href: activeClients[0] ? `/clients/${activeClients[0].slug}` : null,
     },
     ...(isFounder
       ? [
@@ -106,16 +108,19 @@ export default async function HomePage() {
             label: "Open tasks",
             value: taskCount?.[0]?.value ?? 0,
             icon: CheckSquare,
+            href: activeClients[0] ? `/clients/${activeClients[0].slug}` : null,
           },
           {
             label: "Pending invoices",
             value: pendingInvoices?.[0]?.value ?? 0,
             icon: Receipt,
+            href: activeClients[0] ? `/clients/${activeClients[0].slug}` : null,
           },
           {
             label: "New leads",
             value: leadCount?.[0]?.value ?? 0,
             icon: Compass,
+            href: activeClients[0] ? `/clients/${activeClients[0].slug}` : null,
           },
         ]
       : [
@@ -123,6 +128,7 @@ export default async function HomePage() {
             label: "Discoveries",
             value: discoveriesCount[0]?.value ?? 0,
             icon: Compass,
+            href: "/settings",
           },
         ]),
   ];
@@ -143,23 +149,43 @@ export default async function HomePage() {
 
       {/* Stats row */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-10">
-        {stats.map((stat) => (
-          <div
-            key={stat.label}
-            className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-4"
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <stat.icon
-                className="w-4 h-4 text-[var(--ink-muted)]"
-                strokeWidth={1.5}
-              />
-              <span className="text-xs text-[var(--ink-muted)]">
-                {stat.label}
-              </span>
+        {stats.map((stat) => {
+          const inner = (
+            <>
+              <div className="flex items-center gap-2 mb-2">
+                <stat.icon
+                  className="w-4 h-4 text-[var(--ink-muted)]"
+                  strokeWidth={1.5}
+                />
+                <span className="text-xs text-[var(--ink-muted)]">
+                  {stat.label}
+                </span>
+              </div>
+              <p className="text-2xl font-semibold font-serif">{stat.value}</p>
+            </>
+          );
+
+          if (stat.href) {
+            return (
+              <Link
+                key={stat.label}
+                href={stat.href}
+                className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-4 hover:shadow-card hover:border-[var(--accent-clay)]/30 transition-all duration-200"
+              >
+                {inner}
+              </Link>
+            );
+          }
+
+          return (
+            <div
+              key={stat.label}
+              className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-4"
+            >
+              {inner}
             </div>
-            <p className="text-2xl font-semibold font-serif">{stat.value}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Recent activity — founders and managers */}

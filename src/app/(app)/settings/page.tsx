@@ -12,10 +12,6 @@ import {
   Rss,
   Zap,
   LogOut,
-  Users,
-  Check,
-  X,
-  Shield,
   User,
   Key,
 } from "lucide-react";
@@ -52,15 +48,6 @@ const PROVIDER_INFO: Record<string, { label: string; description: string }> = {
   },
 };
 
-interface TeamUser {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  status: string;
-  createdAt: string;
-}
-
 export default function SettingsPage() {
   const router = useRouter();
   const { user: currentUser } = useUser();
@@ -71,42 +58,58 @@ export default function SettingsPage() {
   const [pollResult, setPollResult] = useState<string | null>(null);
   const [scoreResult, setScoreResult] = useState<string | null>(null);
   const [dark, setDark] = useState(false);
-  const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
-  const [teamLoading, setTeamLoading] = useState(false);
   // Profile editing
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [profileCurrentPw, setProfileCurrentPw] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState("");
+  // Password
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordMsg, setPasswordMsg] = useState("");
+
+  const [originalEmail, setOriginalEmail] = useState("");
 
   useEffect(() => {
     if (currentUser) {
       setEditName(currentUser.name || "");
-      setEditEmail((currentUser as unknown as Record<string, string>).email || "");
+      const email = (currentUser as unknown as Record<string, string>).email || "";
+      setEditEmail(email);
+      setOriginalEmail(email);
     }
   }, [currentUser]);
 
+  const emailChanged = editEmail !== originalEmail;
+
   const handleSaveProfile = async () => {
+    if (emailChanged && !profileCurrentPw) {
+      setProfileMsg("Current password required to change email");
+      return;
+    }
     setProfileSaving(true);
     setProfileMsg("");
     try {
       const res = await fetch("/api/auth/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editName, email: editEmail }),
+        body: JSON.stringify({
+          name: editName,
+          email: editEmail,
+          currentPassword: emailChanged ? profileCurrentPw : undefined,
+        }),
       });
       if (res.ok) {
         setProfileMsg("Profile updated");
-        // Refresh user data
+        setProfileCurrentPw("");
         const statusRes = await fetch("/api/auth/status");
         const data = await statusRes.json();
         if (data.user) {
           const { setUser } = useUser.getState();
           setUser(data.user);
+          setOriginalEmail(data.user.email || "");
         }
       } else {
         const data = await res.json();
@@ -120,8 +123,12 @@ export default function SettingsPage() {
   };
 
   const handleSetPassword = async () => {
+    if (!currentPassword) {
+      setPasswordMsg("Current password is required");
+      return;
+    }
     if (newPassword.length < 6) {
-      setPasswordMsg("Password must be at least 6 characters");
+      setPasswordMsg("New password must be at least 6 characters");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -134,10 +141,11 @@ export default function SettingsPage() {
       const res = await fetch("/api/auth/password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: newPassword }),
+        body: JSON.stringify({ currentPassword, password: newPassword }),
       });
       if (res.ok) {
-        setPasswordMsg("Password set successfully");
+        setPasswordMsg("Password updated successfully");
+        setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
       } else {
@@ -160,54 +168,6 @@ export default function SettingsPage() {
         setLoading(false);
       });
   }, []);
-
-  // Load team users for founders
-  useEffect(() => {
-    if (currentUser?.role !== "founder") return;
-    setTeamLoading(true);
-    fetch("/api/users")
-      .then((r) => r.json())
-      .then((data) => {
-        setTeamUsers(Array.isArray(data) ? data : []);
-        setTeamLoading(false);
-      })
-      .catch(() => setTeamLoading(false));
-  }, [currentUser?.role]);
-
-  const handleApprove = async (userId: string, role: string) => {
-    await fetch(`/api/users/${userId}/approve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "approve", role }),
-    });
-    setTeamUsers((prev) =>
-      prev.map((u) =>
-        u.id === userId ? { ...u, status: "active", role } : u
-      )
-    );
-  };
-
-  const handleReject = async (userId: string) => {
-    await fetch(`/api/users/${userId}/approve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "reject" }),
-    });
-    setTeamUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, status: "rejected" } : u))
-    );
-  };
-
-  const handleChangeRole = async (userId: string, role: string) => {
-    await fetch(`/api/users/${userId}/approve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "change_role", role }),
-    });
-    setTeamUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, role } : u))
-    );
-  };
 
   const toggleDark = () => {
     const next = !dark;
@@ -284,6 +244,126 @@ export default function SettingsPage() {
             <Button variant="outline" size="sm" onClick={toggleDark}>
               Switch to {dark ? "light" : "dark"}
             </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Profile */}
+      <section className="mb-8">
+        <h2 className="text-sm font-medium mb-3">Profile</h2>
+        <div className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-5 space-y-4">
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1.5">
+                Name
+              </label>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1.5">
+                Email
+              </label>
+              <input
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors"
+              />
+            </div>
+            {emailChanged && (
+              <div>
+                <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1.5">
+                  Current password (required to change email)
+                </label>
+                <input
+                  type="password"
+                  value={profileCurrentPw}
+                  onChange={(e) => setProfileCurrentPw(e.target.value)}
+                  className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors"
+                />
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSaveProfile}
+              disabled={profileSaving}
+              className="gap-1"
+            >
+              <User className="w-3.5 h-3.5" strokeWidth={1.5} />
+              {profileSaving ? "Saving..." : "Save profile"}
+            </Button>
+            {profileMsg && (
+              <span className="text-xs text-[var(--ink-muted)]">{profileMsg}</span>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Change Password */}
+      <section className="mb-8">
+        <h2 className="text-sm font-medium mb-3">Password</h2>
+        <div className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-5 space-y-4">
+          <p className="text-xs text-[var(--ink-muted)]">
+            Change your password for email + password login.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1.5">
+                Current password
+              </label>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1.5">
+                New password
+              </label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Min 6 characters"
+                className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1.5">
+                Confirm new password
+              </label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSetPassword}
+              disabled={passwordSaving}
+              className="gap-1"
+            >
+              <Key className="w-3.5 h-3.5" strokeWidth={1.5} />
+              {passwordSaving ? "Updating..." : "Update password"}
+            </Button>
+            {passwordMsg && (
+              <span className="text-xs text-[var(--ink-muted)]">{passwordMsg}</span>
+            )}
           </div>
         </div>
       </section>
@@ -424,231 +504,6 @@ export default function SettingsPage() {
             })}
           </div>
         )}
-      </section>
-
-      {/* Team Management — founders only */}
-      {currentUser?.role === "founder" && (
-        <section className="mb-8">
-          <h2 className="text-sm font-medium mb-3">Team</h2>
-          {teamLoading ? (
-            <div className="flex justify-center py-6">
-              <div className="w-5 h-5 border-2 border-[var(--accent-clay)] border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {/* Pending approvals */}
-              {teamUsers.filter((u) => u.status === "pending").length > 0 && (
-                <div className="rounded-[var(--radius)] border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-4 mb-3">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Shield className="w-4 h-4 text-amber-600" strokeWidth={1.5} />
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                      Pending approvals
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    {teamUsers
-                      .filter((u) => u.status === "pending")
-                      .map((u) => (
-                        <div
-                          key={u.id}
-                          className="flex items-center justify-between bg-white dark:bg-[var(--surface)] rounded-[var(--radius-sm)] p-3 border border-[var(--rule)]"
-                        >
-                          <div>
-                            <p className="text-sm font-medium">{u.name}</p>
-                            <p className="text-xs text-[var(--ink-muted)]">
-                              {u.email}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1 text-green-600 h-7 text-xs"
-                              onClick={() => handleApprove(u.id, "member")}
-                            >
-                              <Check className="w-3 h-3" strokeWidth={2} />
-                              Member
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1 text-blue-600 h-7 text-xs"
-                              onClick={() => handleApprove(u.id, "manager")}
-                            >
-                              <Check className="w-3 h-3" strokeWidth={2} />
-                              Manager
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="gap-1 text-destructive h-7 text-xs"
-                              onClick={() => handleReject(u.id)}
-                            >
-                              <X className="w-3 h-3" strokeWidth={2} />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Active team members */}
-              {teamUsers
-                .filter((u) => u.status === "active")
-                .map((u) => (
-                  <div
-                    key={u.id}
-                    className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-4"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[var(--accent-clay)]/10 flex items-center justify-center">
-                          <span className="text-xs font-medium text-[var(--accent-clay)]">
-                            {u.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")
-                              .toUpperCase()
-                              .slice(0, 2)}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{u.name}</p>
-                          <p className="text-xs text-[var(--ink-muted)]">
-                            {u.email}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant="secondary"
-                          className={`text-[10px] ${
-                            u.role === "founder"
-                              ? "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300"
-                              : u.role === "manager"
-                              ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                              : ""
-                          }`}
-                        >
-                          {u.role}
-                        </Badge>
-                        {u.id !== currentUser?.id && (
-                          <select
-                            value={u.role}
-                            onChange={(e) =>
-                              handleChangeRole(u.id, e.target.value)
-                            }
-                            className="text-xs h-7 px-2 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--surface)]"
-                          >
-                            <option value="member">Member</option>
-                            <option value="manager">Manager</option>
-                            <option value="founder">Founder</option>
-                          </select>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Profile */}
-      <section className="mb-8">
-        <h2 className="text-sm font-medium mb-3">Profile</h2>
-        <div className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-5 space-y-4">
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1.5">
-                Name
-              </label>
-              <input
-                type="text"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1.5">
-                Email
-              </label>
-              <input
-                type="email"
-                value={editEmail}
-                onChange={(e) => setEditEmail(e.target.value)}
-                className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors"
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSaveProfile}
-              disabled={profileSaving}
-              className="gap-1"
-            >
-              <User className="w-3.5 h-3.5" strokeWidth={1.5} />
-              {profileSaving ? "Saving..." : "Save profile"}
-            </Button>
-            {profileMsg && (
-              <span className="text-xs text-[var(--ink-muted)]">{profileMsg}</span>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Set Password */}
-      <section className="mb-8">
-        <h2 className="text-sm font-medium mb-3">Password</h2>
-        <div className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-5 space-y-4">
-          <p className="text-xs text-[var(--ink-muted)]">
-            Set a password to enable email + password login from any device.
-          </p>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1.5">
-                New password
-              </label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Min 6 characters"
-                className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1.5">
-                Confirm password
-              </label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors"
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSetPassword}
-              disabled={passwordSaving}
-              className="gap-1"
-            >
-              <Key className="w-3.5 h-3.5" strokeWidth={1.5} />
-              {passwordSaving ? "Setting..." : "Set password"}
-            </Button>
-            {passwordMsg && (
-              <span className="text-xs text-[var(--ink-muted)]">{passwordMsg}</span>
-            )}
-          </div>
-        </div>
       </section>
 
       {/* Sign Out */}

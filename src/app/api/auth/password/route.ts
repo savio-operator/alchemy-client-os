@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, hashPassword } from "@/lib/auth";
+import { getCurrentUser, hashPassword, verifyPassword } from "@/lib/auth";
 import { db, initPromise } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -13,10 +13,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { password } = await request.json();
+  const { currentPassword, password } = await request.json();
+
+  if (!currentPassword) {
+    return NextResponse.json({ error: "Current password required" }, { status: 403 });
+  }
+
+  if (!verifyPassword(currentPassword, user.passwordHash)) {
+    return NextResponse.json({ error: "Incorrect current password" }, { status: 403 });
+  }
 
   if (!password || password.length < 6) {
-    return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
+    return NextResponse.json({ error: "New password must be at least 6 characters" }, { status: 400 });
   }
 
   const passwordHash = hashPassword(password);

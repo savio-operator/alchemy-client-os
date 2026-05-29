@@ -200,11 +200,11 @@ export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
         {/* Team — founders only */}
         {isFounder && (
           <SidebarLink
-            href="/settings"
+            href="/team"
             icon={Users}
             label="Team"
             expanded={expanded}
-            active={false}
+            active={pathname === "/team"}
           />
         )}
 

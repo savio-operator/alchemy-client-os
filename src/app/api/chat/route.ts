@@ -164,37 +164,42 @@ export async function POST(request: Request) {
   let finalResponse = "";
   const allToolCalls: Array<{ name: string; args: Record<string, unknown>; result: string }> = [];
 
-  for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
-    const aiResponse = await callAIChat(systemPrompt, chatMessages);
-    const toolCalls = parseToolCalls(aiResponse);
-    const textPart = stripToolCalls(aiResponse);
+  try {
+    for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+      const aiResponse = await callAIChat(systemPrompt, chatMessages);
+      const toolCalls = parseToolCalls(aiResponse);
+      const textPart = stripToolCalls(aiResponse);
 
-    if (toolCalls.length === 0) {
-      finalResponse = textPart || aiResponse;
-      break;
-    }
+      if (toolCalls.length === 0) {
+        finalResponse = textPart || aiResponse;
+        break;
+      }
 
-    // Execute tools and collect results
-    const toolResults: string[] = [];
-    for (const tc of toolCalls) {
-      const result = await executeTool(tc.tool, tc.args, clientId, convId);
-      toolResults.push(`[${tc.tool}]: ${result}`);
-      allToolCalls.push({ name: tc.tool, args: tc.args, result });
-    }
+      // Execute tools and collect results
+      const toolResults: string[] = [];
+      for (const tc of toolCalls) {
+        const result = await executeTool(tc.tool, tc.args, clientId, convId);
+        toolResults.push(`[${tc.tool}]: ${result}`);
+        allToolCalls.push({ name: tc.tool, args: tc.args, result });
+      }
 
-    // Add AI response + tool results to conversation for next iteration
-    if (textPart) {
-      chatMessages.push({ role: "assistant", content: textPart });
-    }
-    chatMessages.push({
-      role: "user",
-      content: toolResults.join("\n"),
-    });
+      // Add AI response + tool results to conversation for next iteration
+      if (textPart) {
+        chatMessages.push({ role: "assistant", content: textPart });
+      }
+      chatMessages.push({
+        role: "user",
+        content: toolResults.join("\n"),
+      });
 
-    // If this is the last iteration, use whatever we have
-    if (i === MAX_TOOL_ITERATIONS - 1) {
-      finalResponse = textPart || "I executed the requested actions.";
+      // If this is the last iteration, use whatever we have
+      if (i === MAX_TOOL_ITERATIONS - 1) {
+        finalResponse = textPart || "I executed the requested actions.";
+      }
     }
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : "AI service error";
+    return NextResponse.json({ error: errMsg }, { status: 503 });
   }
 
   // Save assistant response
