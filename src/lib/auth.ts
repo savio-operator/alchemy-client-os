@@ -80,23 +80,27 @@ export async function validateSession(): Promise<{
 
   if (!user || user.status !== "active") return { valid: false, user: null };
 
-  // Rolling session: extend expiry
-  const newExpiry = new Date(
-    Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000
-  ).toISOString();
-  await db
-    .update(sessions)
-    .set({ expiresAt: newExpiry })
-    .where(eq(sessions.id, sessionId))
-    .run();
+  // Rolling session: extend expiry (only works in Route Handlers, not Server Components)
+  try {
+    const newExpiry = new Date(
+      Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000
+    ).toISOString();
+    await db
+      .update(sessions)
+      .set({ expiresAt: newExpiry })
+      .where(eq(sessions.id, sessionId))
+      .run();
 
-  cookieStore.set(SESSION_COOKIE, sessionId, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: SESSION_DAYS * 24 * 60 * 60,
-    path: "/",
-  });
+    cookieStore.set(SESSION_COOKIE, sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: SESSION_DAYS * 24 * 60 * 60,
+      path: "/",
+    });
+  } catch {
+    // Cookie modification not allowed in Server Components — skip extension
+  }
 
   return { valid: true, user };
 }
