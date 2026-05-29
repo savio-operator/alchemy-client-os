@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import {
   Settings,
   Unplug,
@@ -17,6 +16,8 @@ import {
   Check,
   X,
   Shield,
+  User,
+  Key,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -72,6 +73,83 @@ export default function SettingsPage() {
   const [dark, setDark] = useState(false);
   const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
   const [teamLoading, setTeamLoading] = useState(false);
+  // Profile editing
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMsg, setProfileMsg] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordMsg, setPasswordMsg] = useState("");
+
+  useEffect(() => {
+    if (currentUser) {
+      setEditName(currentUser.name || "");
+      setEditEmail((currentUser as unknown as Record<string, string>).email || "");
+    }
+  }, [currentUser]);
+
+  const handleSaveProfile = async () => {
+    setProfileSaving(true);
+    setProfileMsg("");
+    try {
+      const res = await fetch("/api/auth/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editName, email: editEmail }),
+      });
+      if (res.ok) {
+        setProfileMsg("Profile updated");
+        // Refresh user data
+        const statusRes = await fetch("/api/auth/status");
+        const data = await statusRes.json();
+        if (data.user) {
+          const { setUser } = useUser.getState();
+          setUser(data.user);
+        }
+      } else {
+        const data = await res.json();
+        setProfileMsg(data.error || "Update failed");
+      }
+    } catch {
+      setProfileMsg("Connection error");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleSetPassword = async () => {
+    if (newPassword.length < 6) {
+      setPasswordMsg("Password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMsg("Passwords don't match");
+      return;
+    }
+    setPasswordSaving(true);
+    setPasswordMsg("");
+    try {
+      const res = await fetch("/api/auth/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: newPassword }),
+      });
+      if (res.ok) {
+        setPasswordMsg("Password set successfully");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        const data = await res.json();
+        setPasswordMsg(data.error || "Failed");
+      }
+    } catch {
+      setPasswordMsg("Connection error");
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
 
   useEffect(() => {
     setDark(document.documentElement.classList.contains("dark"));
@@ -290,11 +368,8 @@ export default function SettingsPage() {
             {integrations.map((integration) => {
               const info = PROVIDER_INFO[integration.provider];
               return (
-                <motion.div
+                <div
                   key={integration.provider}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.22 }}
                   className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-5"
                 >
                   <div className="flex items-center justify-between">
@@ -344,7 +419,7 @@ export default function SettingsPage() {
                       </Button>
                     )}
                   </div>
-                </motion.div>
+                </div>
               );
             })}
           </div>
@@ -479,6 +554,102 @@ export default function SettingsPage() {
           )}
         </section>
       )}
+
+      {/* Profile */}
+      <section className="mb-8">
+        <h2 className="text-sm font-medium mb-3">Profile</h2>
+        <div className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-5 space-y-4">
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1.5">
+                Name
+              </label>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1.5">
+                Email
+              </label>
+              <input
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSaveProfile}
+              disabled={profileSaving}
+              className="gap-1"
+            >
+              <User className="w-3.5 h-3.5" strokeWidth={1.5} />
+              {profileSaving ? "Saving..." : "Save profile"}
+            </Button>
+            {profileMsg && (
+              <span className="text-xs text-[var(--ink-muted)]">{profileMsg}</span>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Set Password */}
+      <section className="mb-8">
+        <h2 className="text-sm font-medium mb-3">Password</h2>
+        <div className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-5 space-y-4">
+          <p className="text-xs text-[var(--ink-muted)]">
+            Set a password to enable email + password login from any device.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1.5">
+                New password
+              </label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Min 6 characters"
+                className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1.5">
+                Confirm password
+              </label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSetPassword}
+              disabled={passwordSaving}
+              className="gap-1"
+            >
+              <Key className="w-3.5 h-3.5" strokeWidth={1.5} />
+              {passwordSaving ? "Setting..." : "Set password"}
+            </Button>
+            {passwordMsg && (
+              <span className="text-xs text-[var(--ink-muted)]">{passwordMsg}</span>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* Sign Out */}
       <section>

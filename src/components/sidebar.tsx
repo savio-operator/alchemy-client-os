@@ -59,23 +59,23 @@ export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
       {/* Header */}
       <div className="flex items-center justify-between p-3 h-14">
         {expanded ? (
-          <Link href="/">
-            <motion.span
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-sm font-semibold tracking-tight truncate hover:text-[var(--accent-clay)] transition-colors duration-120 cursor-pointer"
-            >
+          <Link
+            href="/"
+            className="flex items-center gap-2 h-8 px-2.5 rounded-[var(--radius-sm)] bg-[var(--accent-clay)]/10 hover:bg-[var(--accent-clay)]/18 transition-colors duration-120"
+          >
+            <Briefcase className="w-3.5 h-3.5 text-[var(--accent-clay)]" strokeWidth={1.5} />
+            <span className="text-sm font-semibold tracking-tight text-[var(--accent-clay)]">
               Adchemy
-            </motion.span>
+            </span>
           </Link>
         ) : (
           <Tooltip>
             <TooltipTrigger
-              className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)] transition-colors duration-120"
+              className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] bg-[var(--accent-clay)]/10 hover:bg-[var(--accent-clay)]/18 transition-colors duration-120"
               onClick={() => (window.location.href = "/")}
             >
               <Briefcase
-                className="w-4 h-4 text-[var(--ink-muted)]"
+                className="w-4 h-4 text-[var(--accent-clay)]"
                 strokeWidth={1.5}
               />
             </TooltipTrigger>
@@ -200,7 +200,7 @@ export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
         {/* Team — founders only */}
         {isFounder && (
           <SidebarLink
-            href="/settings?tab=team"
+            href="/settings"
             icon={Users}
             label="Team"
             expanded={expanded}
