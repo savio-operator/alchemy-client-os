@@ -12,6 +12,10 @@ import {
   Printer,
   Trash2,
   CheckCircle,
+  Mail,
+  CreditCard,
+  Link as LinkIcon,
+  Copy,
 } from "lucide-react";
 
 interface LineItem {
@@ -70,6 +74,20 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
   const [saving, setSaving] = useState(false);
   const [clients, setClients] = useState<ClientOption[]>([]);
 
+  // Email modal state
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailTo, setEmailTo] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailResult, setEmailResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  // Payment link state
+  const [paymentLink, setPaymentLink] = useState<string | null>(null);
+  const [creatingPaymentLink, setCreatingPaymentLink] = useState(false);
+  const [paymentLinkError, setPaymentLinkError] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+
   // Form state
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [clientId, setClientId] = useState("");
@@ -124,6 +142,12 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
           amount: i.amount,
         })));
       }
+
+      // Fetch existing payment link
+      fetch(`/api/invoices/${id}/payment-link`)
+        .then((r) => r.json())
+        .then((d) => { if (d.paymentLink) setPaymentLink(d.paymentLink); })
+        .catch(() => {});
 
       setLoading(false);
     });
@@ -201,6 +225,59 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
     if (res.ok) router.push("/invoices");
   };
 
+  const handleSendEmail = async () => {
+    if (!emailTo.trim()) return;
+    setSendingEmail(true);
+    setEmailResult(null);
+    try {
+      const res = await fetch(`/api/invoices/${id}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: emailTo.trim(),
+          subject: emailSubject || undefined,
+          message: emailMessage || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEmailResult({ ok: true, msg: "Invoice sent successfully!" });
+        if (status === "draft") setStatus("sent");
+        setTimeout(() => { setShowEmailModal(false); setEmailResult(null); }, 2000);
+      } else {
+        setEmailResult({ ok: false, msg: data.error || "Failed to send" });
+      }
+    } catch {
+      setEmailResult({ ok: false, msg: "Network error" });
+    }
+    setSendingEmail(false);
+  };
+
+  const handleCreatePaymentLink = async () => {
+    setCreatingPaymentLink(true);
+    setPaymentLinkError(null);
+    try {
+      const res = await fetch(`/api/invoices/${id}/payment-link`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok && data.paymentLink) {
+        setPaymentLink(data.paymentLink);
+      } else {
+        setPaymentLinkError(data.error || "Failed to create payment link");
+      }
+    } catch {
+      setPaymentLinkError("Network error");
+    }
+    setCreatingPaymentLink(false);
+  };
+
+  const copyPaymentLink = () => {
+    if (paymentLink) {
+      navigator.clipboard.writeText(paymentLink);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -251,6 +328,13 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
             </button>
           )}
           <button
+            onClick={() => setShowEmailModal(true)}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[var(--radius-sm)] text-sm font-medium border border-[var(--rule)] hover:bg-[var(--muted)] transition-colors"
+          >
+            <Mail className="w-3.5 h-3.5" strokeWidth={1.5} />
+            Email
+          </button>
+          <button
             onClick={() => router.push(`/invoices/${id}/preview`)}
             className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[var(--radius-sm)] text-sm font-medium border border-[var(--rule)] hover:bg-[var(--muted)] transition-colors"
           >
@@ -265,6 +349,44 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
           </button>
         </div>
       </div>
+
+      {/* Email modal */}
+      {showEmailModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowEmailModal(false)}>
+          <div className="bg-[var(--surface)] rounded-[var(--radius)] border border-[var(--rule)] p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold">Send Invoice via Email</h3>
+              <button onClick={() => setShowEmailModal(false)} className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--muted)]">
+                <X className="w-4 h-4 text-[var(--ink-muted)]" strokeWidth={1.5} />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-[var(--ink-muted)] mb-1">To <span className="text-[var(--accent-clay)]">*</span></label>
+                <input type="email" value={emailTo} onChange={(e) => setEmailTo(e.target.value)} placeholder="client@example.com" required className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
+              </div>
+              <div>
+                <label className="block text-xs text-[var(--ink-muted)] mb-1">Subject</label>
+                <input type="text" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} placeholder={`Invoice ${invoiceNumber}`} className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
+              </div>
+              <div>
+                <label className="block text-xs text-[var(--ink-muted)] mb-1">Message (optional)</label>
+                <textarea value={emailMessage} onChange={(e) => setEmailMessage(e.target.value)} rows={3} placeholder="Hi, please find attached the invoice..." className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent resize-none outline-none focus:border-[var(--accent-clay)]" />
+              </div>
+              {emailResult && (
+                <p className={`text-xs ${emailResult.ok ? "text-green-600" : "text-red-500"}`}>{emailResult.msg}</p>
+              )}
+              <div className="flex items-center gap-2 pt-1">
+                <button onClick={handleSendEmail} disabled={sendingEmail || !emailTo.trim()} className="inline-flex items-center gap-1.5 h-8 px-4 rounded-[var(--radius-sm)] text-sm font-medium bg-[var(--accent-clay)] hover:bg-[var(--accent-clay)]/90 text-white transition-colors disabled:opacity-60">
+                  {sendingEmail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" strokeWidth={1.5} />}
+                  {sendingEmail ? "Sending..." : "Send"}
+                </button>
+                <button onClick={() => setShowEmailModal(false)} className="h-8 px-3 text-sm text-[var(--ink-muted)] hover:text-[var(--ink)]">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-6">
         {/* From / To */}
@@ -447,6 +569,46 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
             placeholder="Payment terms, bank details, or any notes..."
             className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent resize-none outline-none focus:border-[var(--accent-clay)]"
           />
+        </div>
+
+        {/* Payment link */}
+        <div className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <CreditCard className="w-4 h-4 text-[var(--ink-muted)]" strokeWidth={1.5} />
+            <h3 className="text-xs font-medium text-[var(--ink-muted)] uppercase tracking-wide">Payment Link (Razorpay)</h3>
+          </div>
+          {paymentLink ? (
+            <div className="flex items-center gap-2">
+              <div className="flex-1 flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] bg-[var(--muted)] text-sm truncate">
+                <LinkIcon className="w-3.5 h-3.5 text-[var(--ink-muted)] shrink-0" strokeWidth={1.5} />
+                <a href={paymentLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate">{paymentLink}</a>
+              </div>
+              <button
+                onClick={copyPaymentLink}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[var(--radius-sm)] text-xs font-medium border border-[var(--rule)] hover:bg-[var(--muted)] transition-colors"
+              >
+                <Copy className="w-3.5 h-3.5" strokeWidth={1.5} />
+                {copiedLink ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          ) : (
+            <div>
+              <button
+                onClick={handleCreatePaymentLink}
+                disabled={creatingPaymentLink}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[var(--radius-sm)] text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-60"
+              >
+                {creatingPaymentLink ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" strokeWidth={1.5} />}
+                {creatingPaymentLink ? "Creating..." : "Generate Payment Link"}
+              </button>
+              {paymentLinkError && (
+                <p className="text-xs text-red-500 mt-2">{paymentLinkError}</p>
+              )}
+              <p className="text-xs text-[var(--ink-muted)] mt-2">
+                Creates a Razorpay payment link. The link is included when you email the invoice.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
