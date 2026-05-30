@@ -329,6 +329,16 @@ async function initTables() {
       last_visited_at TEXT NOT NULL,
       PRIMARY KEY (user_id, section)
     );
+
+    CREATE TABLE IF NOT EXISTS invoice_items (
+      id TEXT PRIMARY KEY,
+      invoice_id TEXT NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+      description TEXT NOT NULL,
+      quantity REAL NOT NULL DEFAULT 1,
+      rate REAL NOT NULL,
+      amount REAL NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0
+    );
   `);
 
   // New tables for Discord-like chat
@@ -416,6 +426,12 @@ async function initTables() {
     "ALTER TABLE chat_channels ADD COLUMN is_private INTEGER DEFAULT 0",
     "ALTER TABLE attendance ADD COLUMN status TEXT NOT NULL DEFAULT 'completed'",
     "ALTER TABLE attendance ADD COLUMN notes TEXT",
+    "ALTER TABLE invoices ADD COLUMN tax_percent REAL DEFAULT 0",
+    "ALTER TABLE invoices ADD COLUMN discount_amount REAL DEFAULT 0",
+    "ALTER TABLE invoices ADD COLUMN notes TEXT",
+    "ALTER TABLE invoices ADD COLUMN from_name TEXT",
+    "ALTER TABLE invoices ADD COLUMN from_address TEXT",
+    "ALTER TABLE invoices ADD COLUMN from_gst TEXT",
   ];
   for (const sql of alters) {
     try {

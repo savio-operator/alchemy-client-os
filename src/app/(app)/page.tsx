@@ -230,7 +230,7 @@ export default async function HomePage() {
       )}
 
       {/* Client cards */}
-      <section>
+      <section id="clients">
         <h2 className="text-sm font-medium text-[var(--ink-muted)] uppercase tracking-wide mb-3">
           Clients
         </h2>

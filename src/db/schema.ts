@@ -369,8 +369,24 @@ export const invoices = sqliteTable("invoices", {
   dueDate: text("due_date"),
   paidAt: text("paid_at"),
   description: text("description"),
+  taxPercent: real("tax_percent").default(0),
+  discountAmount: real("discount_amount").default(0),
+  notes: text("notes"),
+  fromName: text("from_name"),
+  fromAddress: text("from_address"),
+  fromGst: text("from_gst"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
+});
+
+export const invoiceItems = sqliteTable("invoice_items", {
+  id: text("id").primaryKey(),
+  invoiceId: text("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  description: text("description").notNull(),
+  quantity: real("quantity").notNull().default(1),
+  rate: real("rate").notNull(),
+  amount: real("amount").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
 });
 
 export const leads = sqliteTable("leads", {
@@ -478,4 +494,5 @@ export type Lead = typeof leads.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type Note = typeof notes.$inferSelect;
 export type Deliverable = typeof deliverables.$inferSelect;
+export type InvoiceItem = typeof invoiceItems.$inferSelect;
 export type Challenge = typeof challenges.$inferSelect;
