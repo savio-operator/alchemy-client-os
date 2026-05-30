@@ -375,6 +375,33 @@ async function initTables() {
       deafened INTEGER DEFAULT 0,
       PRIMARY KEY (channel_id, user_id)
     );
+
+    CREATE TABLE IF NOT EXISTS voice_signals (
+      id TEXT PRIMARY KEY,
+      channel_id TEXT NOT NULL,
+      from_user_id TEXT NOT NULL,
+      to_user_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
+
+  // Challenges table
+  await client.executeMultiple(`
+    CREATE TABLE IF NOT EXISTS challenges (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      assigned_to TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      assigned_by TEXT NOT NULL REFERENCES users(id),
+      status TEXT NOT NULL DEFAULT 'active',
+      reward TEXT,
+      due_date TEXT,
+      completed_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `);
 
   // Idempotent ALTER TABLE statements for new columns

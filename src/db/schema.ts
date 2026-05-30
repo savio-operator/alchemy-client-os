@@ -327,6 +327,16 @@ export const voiceParticipants = sqliteTable("voice_participants", {
   deafened: integer("deafened", { mode: "boolean" }).default(false),
 });
 
+export const voiceSignals = sqliteTable("voice_signals", {
+  id: text("id").primaryKey(),
+  channelId: text("channel_id").notNull(),
+  fromUserId: text("from_user_id").notNull(),
+  toUserId: text("to_user_id").notNull(),
+  type: text("type").notNull(), // offer, answer, ice-candidate
+  payload: text("payload").notNull(), // JSON
+  createdAt: text("created_at").notNull(),
+});
+
 export const userPresence = sqliteTable("user_presence", {
   userId: text("user_id")
     .primaryKey()
@@ -419,6 +429,22 @@ export const deliverables = sqliteTable("deliverables", {
   updatedAt: text("updated_at").notNull(),
 });
 
+// --- Team Tasks & Challenges ---
+
+export const challenges = sqliteTable("challenges", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  assignedTo: text("assigned_to").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assignedBy: text("assigned_by").notNull().references(() => users.id),
+  status: text("status").notNull().default("active"), // active, completed, expired
+  reward: text("reward"),
+  dueDate: text("due_date"),
+  completedAt: text("completed_at"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 // --- Types ---
 
 export type User = typeof users.$inferSelect;
@@ -445,9 +471,11 @@ export type ChatReaction = typeof chatReactions.$inferSelect;
 export type ChatPoll = typeof chatPolls.$inferSelect;
 export type ChatPollVote = typeof chatPollVotes.$inferSelect;
 export type VoiceParticipant = typeof voiceParticipants.$inferSelect;
+export type VoiceSignal = typeof voiceSignals.$inferSelect;
 export type UserPresence = typeof userPresence.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type Lead = typeof leads.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type Note = typeof notes.$inferSelect;
 export type Deliverable = typeof deliverables.$inferSelect;
+export type Challenge = typeof challenges.$inferSelect;

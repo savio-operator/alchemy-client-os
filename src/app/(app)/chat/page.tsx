@@ -42,10 +42,17 @@ import {
   Globe,
   UserPlus,
   ChevronUp,
+  Video,
+  VideoOff,
+  Monitor,
+  MonitorOff,
+  Minimize2,
+  Maximize2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/store/user";
 import { useTeamChat, type EnrichedMessage, type EnrichedChannel, type PollData } from "@/store/team-chat";
+import { VoiceClient, type VoiceParticipant } from "@/lib/voice-client";
 
 // ─── Avatar helpers ────────────────────────────────────────────────────────────
 
@@ -720,6 +727,15 @@ export default function TeamChatPage() {
   const [connectedVoice, setConnectedVoice] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const [deafened, setDeafened] = useState(false);
+  const [cameraOn, setCameraOn] = useState(false);
+  const [screenSharing, setScreenSharing] = useState(false);
+  const [voiceMinimized, setVoiceMinimized] = useState(false);
+  const [voiceParticipants, setVoiceParticipants] = useState<VoiceParticipant[]>([]);
+  const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
+  const [voiceChannelParticipants, setVoiceChannelParticipants] = useState<Record<string, VoiceParticipant[]>>({});
+  const voiceClientRef = useRef<VoiceClient | null>(null);
+  const remoteAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
@@ -738,6 +754,7 @@ export default function TeamChatPage() {
   const editInputRef = useRef<HTMLTextAreaElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const plusMenuRef = useRef<HTMLDivElement>(null);
+  const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
 
   const isFounder = user?.role === "founder";
   const isManager = user?.role === "manager";
@@ -899,6 +916,157 @@ export default function TeamChatPage() {
 
   const settingsChannel = channelSettingsId ? channels.find((c) => c.id === channelSettingsId) : null;
   const settingsMembers = channelSettingsId ? (channelMembers[channelSettingsId] || []) : [];
+
+  // ── Voice handlers ────────────────────────────────────────────────────────────
+
+  const handleVoiceConnect = useCallback(async (channelId: string) => {
+    if (connectedVoice === channelId) {
+      // Disconnect
+      await voiceClientRef.current?.leave();
+      voiceClientRef.current = null;
+      setConnectedVoice(null);
+      setVoiceParticipants([]);
+      setRemoteStreams(new Map());
+      setCameraOn(false);
+      setScreenSharing(false);
+      setMuted(false);
+      setDeafened(false);
+      // Clean up audio elements
+      remoteAudioRefs.current.forEach((a) => { a.pause(); a.srcObject = null; });
+      remoteAudioRefs.current.clear();
+      return;
+    }
+
+    // Disconnect from previous channel if any
+    if (voiceClientRef.current) {
+      await voiceClientRef.current.leave();
+      voiceClientRef.current = null;
+      remoteAudioRefs.current.forEach((a) => { a.pause(); a.srcObject = null; });
+      remoteAudioRefs.current.clear();
+    }
+
+    const client = new VoiceClient(channelId, user!.id);
+
+    client.onRemoteStream = (userId, stream, type) => {
+      setRemoteStreams((prev) => new Map(prev).set(userId, stream));
+      if (type === "audio") {
+        // Attach to an Audio element for playback
+        let audio = remoteAudioRefs.current.get(userId);
+        if (!audio) {
+          audio = new Audio();
+          audio.autoplay = true;
+          remoteAudioRefs.current.set(userId, audio);
+        }
+        audio.srcObject = stream;
+        audio.muted = deafened;
+        audio.play().catch(() => {});
+      }
+      // Video streams are attached via remoteVideoRefs when the tile mounts
+    };
+
+    client.onParticipantLeft = (userId) => {
+      setRemoteStreams((prev) => {
+        const m = new Map(prev);
+        m.delete(userId);
+        return m;
+      });
+      const audio = remoteAudioRefs.current.get(userId);
+      if (audio) {
+        audio.pause();
+        audio.srcObject = null;
+        remoteAudioRefs.current.delete(userId);
+      }
+    };
+
+    client.onParticipantsUpdate = (participants) => {
+      setVoiceParticipants(participants);
+    };
+
+    voiceClientRef.current = client;
+    setConnectedVoice(channelId);
+    setMuted(false);
+    setDeafened(false);
+
+    try {
+      await client.join();
+    } catch (err) {
+      console.error("Voice join failed:", err);
+      voiceClientRef.current = null;
+      setConnectedVoice(null);
+    }
+  }, [connectedVoice, user, deafened]);
+
+  const handleToggleMute = useCallback(() => {
+    const next = !muted;
+    setMuted(next);
+    voiceClientRef.current?.setMuted(next);
+  }, [muted]);
+
+  const handleToggleDeafen = useCallback(() => {
+    const next = !deafened;
+    setDeafened(next);
+    voiceClientRef.current?.setDeafened(next);
+    // Mute/unmute all remote audio elements
+    remoteAudioRefs.current.forEach((a) => { a.muted = next; });
+  }, [deafened]);
+
+  const handleToggleCamera = useCallback(async () => {
+    if (!voiceClientRef.current) return;
+    if (cameraOn) {
+      await voiceClientRef.current.disableCamera();
+      setCameraOn(false);
+    } else {
+      try {
+        await voiceClientRef.current.enableCamera();
+        setCameraOn(true);
+      } catch (err) {
+        console.error("Camera failed:", err);
+      }
+    }
+  }, [cameraOn]);
+
+  const handleToggleScreen = useCallback(async () => {
+    if (!voiceClientRef.current) return;
+    if (screenSharing) {
+      await voiceClientRef.current.stopScreenShare();
+      setScreenSharing(false);
+    } else {
+      try {
+        await voiceClientRef.current.shareScreen();
+        setScreenSharing(true);
+      } catch (err) {
+        console.error("Screen share failed:", err);
+      }
+    }
+  }, [screenSharing]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      voiceClientRef.current?.leave();
+    };
+  }, []);
+
+  // Poll voice channel participants for sidebar display (every 10s)
+  useEffect(() => {
+    if (voiceChannels.length === 0) return;
+    const fetchParticipants = async () => {
+      const results: Record<string, VoiceParticipant[]> = {};
+      for (const ch of voiceChannels) {
+        try {
+          const res = await fetch(`/api/team-chat/channels/${ch.id}/voice`);
+          const data = await res.json();
+          results[ch.id] = data.participants || [];
+        } catch {
+          results[ch.id] = [];
+        }
+      }
+      setVoiceChannelParticipants(results);
+    };
+    fetchParticipants();
+    const interval = setInterval(fetchParticipants, 10000);
+    return () => clearInterval(interval);
+  }, [voiceChannels]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -1236,17 +1404,36 @@ export default function TeamChatPage() {
               )}
             </button>
             {voiceChannelsOpen && voiceChannels.map((ch) => (
-              <ChannelItem
-                key={ch.id}
-                channel={ch}
-                active={connectedVoice === ch.id}
-                icon={<Volume2 className="w-4 h-4" strokeWidth={1.5} />}
-                onSelect={() => setConnectedVoice(connectedVoice === ch.id ? null : ch.id)}
-                onRightClick={(e) => handleChannelRightClick(e, ch)}
-                onSettings={() => setChannelSettingsId(ch.id)}
-                canManage={canManage}
-                isVoice
-              />
+              <div key={ch.id}>
+                <ChannelItem
+                  channel={ch}
+                  active={connectedVoice === ch.id}
+                  icon={<Volume2 className="w-4 h-4" strokeWidth={1.5} />}
+                  onSelect={() => handleVoiceConnect(ch.id)}
+                  onRightClick={(e) => handleChannelRightClick(e, ch)}
+                  onSettings={() => setChannelSettingsId(ch.id)}
+                  canManage={canManage}
+                  isVoice
+                />
+                {/* Participant list under voice channel */}
+                {(voiceChannelParticipants[ch.id] || []).length > 0 && (
+                  <div className="pl-7 pb-1 flex flex-col gap-0.5">
+                    {(voiceChannelParticipants[ch.id] || []).map((p) => (
+                      <div key={p.userId} className="flex items-center gap-1.5 text-xs py-0.5 text-[var(--ink-muted)]">
+                        <span
+                          style={{
+                            display: "inline-block", width: 7, height: 7,
+                            borderRadius: "50%", flexShrink: 0,
+                            background: p.muted ? "#f0b132" : "#23a55a",
+                          }}
+                        />
+                        <span className="truncate">{p.userId === user?.id ? `${p.name} (you)` : p.name}</span>
+                        {p.muted && <MicOff className="w-2.5 h-2.5 shrink-0 opacity-60" />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
             {voiceChannelsOpen && voiceChannels.length === 0 && (
               <p className="text-xs text-[var(--ink-muted)] px-4 py-1">No voice channels</p>
@@ -1442,9 +1629,9 @@ export default function TeamChatPage() {
           </div>
         </div>
 
-        {/* Voice connection bar */}
+        {/* Voice connection bar (minimized) */}
         <AnimatePresence>
-          {connectedVoice && (
+          {connectedVoice && voiceMinimized && (
             <motion.div
               initial={{ height: 0 }}
               animate={{ height: 36 }}
@@ -1457,13 +1644,16 @@ export default function TeamChatPage() {
                 <span>Connected — {channels.find((c) => c.id === connectedVoice)?.name || "Voice"}</span>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => setMuted(!muted)} className="p-1 rounded" style={{ color: muted ? "#f23f43" : "#23a55a" }}>
+                <button onClick={handleToggleMute} className="p-1 rounded" style={{ color: muted ? "#f23f43" : "#23a55a" }}>
                   {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                 </button>
-                <button onClick={() => setDeafened(!deafened)} className="p-1 rounded" style={{ color: deafened ? "#f23f43" : "#23a55a" }}>
+                <button onClick={handleToggleDeafen} className="p-1 rounded" style={{ color: deafened ? "#f23f43" : "#23a55a" }}>
                   <Headphones className="w-4 h-4" />
                 </button>
-                <button onClick={() => setConnectedVoice(null)} className="p-1 rounded" style={{ color: "#f23f43" }}>
+                <button onClick={() => setVoiceMinimized(false)} className="p-1 rounded" style={{ color: "var(--ink-muted)" }}>
+                  <Maximize2 className="w-4 h-4" />
+                </button>
+                <button onClick={() => handleVoiceConnect(connectedVoice)} className="p-1 rounded" style={{ color: "#f23f43" }}>
                   <PhoneOff className="w-4 h-4" />
                 </button>
               </div>
@@ -2061,6 +2251,212 @@ export default function TeamChatPage() {
               setChannels(channels.map((c) => c.id === settingsChannel.id ? { ...c, ...updated } : c));
             }}
           />
+        )}
+      </AnimatePresence>
+
+      {/* ── Voice Overlay Panel ── */}
+      <AnimatePresence>
+        {connectedVoice && !voiceMinimized && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.97 }}
+            style={{
+              position: "fixed",
+              bottom: 80,
+              right: 20,
+              width: 360,
+              zIndex: 200,
+              background: "var(--surface)",
+              border: "1px solid var(--rule)",
+              borderRadius: 14,
+              boxShadow: "0 8px 40px rgba(0,0,0,0.45)",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {/* Header */}
+            <div
+              className="flex items-center justify-between px-4 py-2.5"
+              style={{ background: "#23a55a22", borderBottom: "1px solid var(--rule)" }}
+            >
+              <div className="flex items-center gap-2" style={{ color: "#23a55a" }}>
+                <Volume2 className="w-4 h-4" />
+                <span className="text-sm font-semibold">
+                  {channels.find((c) => c.id === connectedVoice)?.name || "Voice"}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setVoiceMinimized(true)}
+                  className="p-1 rounded hover:bg-[var(--muted)] transition-colors"
+                  style={{ color: "var(--ink-muted)" }}
+                  title="Minimize"
+                >
+                  <Minimize2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleVoiceConnect(connectedVoice)}
+                  className="p-1 rounded hover:bg-[var(--muted)] transition-colors"
+                  style={{ color: "#f23f43" }}
+                  title="Disconnect"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Participant grid */}
+            <div className="p-3 flex flex-wrap gap-2">
+              {voiceParticipants.length === 0 ? (
+                <p className="text-xs text-[var(--ink-muted)] w-full text-center py-2">
+                  Connecting...
+                </p>
+              ) : (
+                voiceParticipants.map((p) => {
+                  const videoStream = remoteStreams.get(p.userId);
+                  const isMe = p.userId === user?.id;
+                  return (
+                    <div
+                      key={p.userId}
+                      style={{
+                        width: 76,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: 12,
+                          overflow: "hidden",
+                          position: "relative",
+                          border: "2px solid",
+                          borderColor: p.muted ? "#80848e" : "#23a55a",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {videoStream && !isMe ? (
+                          <video
+                            ref={(el) => {
+                              if (el) {
+                                remoteVideoRefs.current.set(p.userId, el);
+                                if (el.srcObject !== videoStream) {
+                                  el.srcObject = videoStream;
+                                  el.play().catch(() => {});
+                                }
+                              }
+                            }}
+                            autoPlay
+                            playsInline
+                            muted
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: "100%", height: "100%",
+                              background: avatarColor(p.userId),
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: 18, fontWeight: 700, color: "#fff",
+                            }}
+                          >
+                            {initials(p.name)}
+                          </div>
+                        )}
+                        {p.muted && (
+                          <div
+                            style={{
+                              position: "absolute", bottom: 2, right: 2,
+                              background: "rgba(0,0,0,0.7)", borderRadius: "50%",
+                              width: 16, height: 16,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                          >
+                            <MicOff style={{ width: 10, height: 10, color: "#f23f43" }} />
+                          </div>
+                        )}
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 11, color: "var(--ink-muted)",
+                          maxWidth: 72, textAlign: "center",
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}
+                      >
+                        {isMe ? "You" : p.name}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Controls */}
+            <div
+              className="flex items-center justify-center gap-2 px-4 py-3"
+              style={{ borderTop: "1px solid var(--rule)" }}
+            >
+              {/* Mute */}
+              <button
+                onClick={handleToggleMute}
+                title={muted ? "Unmute" : "Mute"}
+                className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--muted)]"
+                style={{ color: muted ? "#f23f43" : "var(--ink-muted)", minWidth: 48 }}
+              >
+                {muted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                <span style={{ fontSize: 10 }}>{muted ? "Unmute" : "Mute"}</span>
+              </button>
+
+              {/* Deafen */}
+              <button
+                onClick={handleToggleDeafen}
+                title={deafened ? "Undeafen" : "Deafen"}
+                className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--muted)]"
+                style={{ color: deafened ? "#f23f43" : "var(--ink-muted)", minWidth: 48 }}
+              >
+                <Headphones className="w-5 h-5" />
+                <span style={{ fontSize: 10 }}>{deafened ? "Undeafen" : "Deafen"}</span>
+              </button>
+
+              {/* Camera */}
+              <button
+                onClick={handleToggleCamera}
+                title={cameraOn ? "Camera Off" : "Camera On"}
+                className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--muted)]"
+                style={{ color: cameraOn ? "#23a55a" : "var(--ink-muted)", minWidth: 48 }}
+              >
+                {cameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+                <span style={{ fontSize: 10 }}>Camera</span>
+              </button>
+
+              {/* Screen share */}
+              <button
+                onClick={handleToggleScreen}
+                title={screenSharing ? "Stop Share" : "Share Screen"}
+                className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--muted)]"
+                style={{ color: screenSharing ? "#23a55a" : "var(--ink-muted)", minWidth: 48 }}
+              >
+                {screenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+                <span style={{ fontSize: 10 }}>Screen</span>
+              </button>
+
+              {/* Disconnect */}
+              <button
+                onClick={() => handleVoiceConnect(connectedVoice)}
+                title="Disconnect"
+                className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--muted)]"
+                style={{ color: "#f23f43", minWidth: 48 }}
+              >
+                <PhoneOff className="w-5 h-5" />
+                <span style={{ fontSize: 10 }}>Leave</span>
+              </button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
