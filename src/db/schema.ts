@@ -231,6 +231,8 @@ export const attendance = sqliteTable("attendance", {
     .references(() => users.id, { onDelete: "cascade" }),
   date: text("date").notNull(), // YYYY-MM-DD
   markedAt: text("marked_at").notNull(),
+  status: text("status").notNull().default("completed"), // completed, in_progress
+  notes: text("notes"), // suggestions if completed, ETA if in progress
 });
 
 // --- Client Access Control ---
@@ -251,8 +253,10 @@ export const userClientAccess = sqliteTable("user_client_access", {
 
 export const chatChannels = sqliteTable("chat_channels", {
   id: text("id").primaryKey(),
-  type: text("type").notNull(), // group, direct
+  type: text("type").notNull(), // group, direct, voice
   name: text("name"),
+  description: text("description"),
+  isPrivate: integer("is_private", { mode: "boolean" }).default(false),
   createdAt: text("created_at").notNull(),
 });
 
@@ -296,6 +300,31 @@ export const chatReactions = sqliteTable("chat_reactions", {
     .references(() => users.id, { onDelete: "cascade" }),
   emoji: text("emoji").notNull(),
   createdAt: text("created_at").notNull(),
+});
+
+export const chatPolls = sqliteTable("chat_polls", {
+  id: text("id").primaryKey(),
+  channelId: text("channel_id").notNull().references(() => chatChannels.id, { onDelete: "cascade" }),
+  messageId: text("message_id").notNull().references(() => chatMessages.id, { onDelete: "cascade" }),
+  question: text("question").notNull(),
+  options: text("options").notNull(), // JSON array of strings
+  createdAt: text("created_at").notNull(),
+});
+
+export const chatPollVotes = sqliteTable("chat_poll_votes", {
+  id: text("id").primaryKey(),
+  pollId: text("poll_id").notNull().references(() => chatPolls.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  optionIndex: integer("option_index").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const voiceParticipants = sqliteTable("voice_participants", {
+  channelId: text("channel_id").notNull().references(() => chatChannels.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  joinedAt: text("joined_at").notNull(),
+  muted: integer("muted", { mode: "boolean" }).default(false),
+  deafened: integer("deafened", { mode: "boolean" }).default(false),
 });
 
 export const userPresence = sqliteTable("user_presence", {
@@ -413,6 +442,9 @@ export type Attendance = typeof attendance.$inferSelect;
 export type ChatChannel = typeof chatChannels.$inferSelect;
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type ChatReaction = typeof chatReactions.$inferSelect;
+export type ChatPoll = typeof chatPolls.$inferSelect;
+export type ChatPollVote = typeof chatPollVotes.$inferSelect;
+export type VoiceParticipant = typeof voiceParticipants.$inferSelect;
 export type UserPresence = typeof userPresence.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type Lead = typeof leads.$inferSelect;

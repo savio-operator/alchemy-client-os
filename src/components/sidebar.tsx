@@ -11,7 +11,7 @@ import {
   ChevronRight,
   Briefcase,
   Users,
-  CalendarCheck,
+  CheckCircle,
   MessageSquare,
 } from "lucide-react";
 import { useSidebar } from "@/store/sidebar";
@@ -188,11 +188,11 @@ export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
           badge={updateCounts.chat}
         />
 
-        {/* Attendance — all roles */}
+        {/* Completion — all roles */}
         <SidebarLink
           href="/attendance"
-          icon={CalendarCheck}
-          label="Attendance"
+          icon={CheckCircle}
+          label="Completion"
           expanded={expanded}
           active={pathname === "/attendance"}
         />

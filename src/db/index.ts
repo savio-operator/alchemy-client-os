@@ -346,6 +346,35 @@ async function initTables() {
       status TEXT NOT NULL DEFAULT 'offline',
       last_seen_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS chat_polls (
+      id TEXT PRIMARY KEY,
+      channel_id TEXT NOT NULL REFERENCES chat_channels(id) ON DELETE CASCADE,
+      message_id TEXT NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+      question TEXT NOT NULL,
+      options TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_poll_votes (
+      id TEXT PRIMARY KEY,
+      poll_id TEXT NOT NULL REFERENCES chat_polls(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      option_index INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_poll_votes_user
+      ON chat_poll_votes(poll_id, user_id);
+
+    CREATE TABLE IF NOT EXISTS voice_participants (
+      channel_id TEXT NOT NULL REFERENCES chat_channels(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      joined_at TEXT NOT NULL,
+      muted INTEGER DEFAULT 0,
+      deafened INTEGER DEFAULT 0,
+      PRIMARY KEY (channel_id, user_id)
+    );
   `);
 
   // Idempotent ALTER TABLE statements for new columns
@@ -356,6 +385,10 @@ async function initTables() {
     "ALTER TABLE chat_messages ADD COLUMN edited_at TEXT",
     "ALTER TABLE chat_messages ADD COLUMN pinned_at TEXT",
     "ALTER TABLE chat_messages ADD COLUMN pinned_by TEXT",
+    "ALTER TABLE chat_channels ADD COLUMN description TEXT",
+    "ALTER TABLE chat_channels ADD COLUMN is_private INTEGER DEFAULT 0",
+    "ALTER TABLE attendance ADD COLUMN status TEXT NOT NULL DEFAULT 'completed'",
+    "ALTER TABLE attendance ADD COLUMN notes TEXT",
   ];
   for (const sql of alters) {
     try {

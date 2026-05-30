@@ -1,19 +1,22 @@
 import { NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, initPromise } from "@/db";
 import { attendance, users } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import crypto from "crypto";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  await initPromise;
 
   const { searchParams } = new URL(request.url);
   const view = searchParams.get("view"); // "team" for founders/managers
 
   if (view === "team" && (user.role === "founder" || user.role === "manager")) {
-    // Team attendance: all users' records for the current month
     const now = new Date();
     const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 
@@ -21,7 +24,7 @@ export async function GET(request: Request) {
     const monthRecords = allRecords.filter((r) => r.date >= monthStart);
 
     const allUsers = await db
-      .select({ id: users.id, name: users.name, role: users.role })
+      .select({ id: users.id, name: users.name, role: users.role, avatarUrl: users.avatarUrl })
       .from(users)
       .where(eq(users.status, "active"))
       .all();
@@ -32,7 +35,7 @@ export async function GET(request: Request) {
     });
   }
 
-  // Own attendance
+  // Own records
   const records = await db
     .select()
     .from(attendance)
@@ -42,19 +45,25 @@ export async function GET(request: Request) {
     .all();
 
   const today = new Date().toISOString().split("T")[0];
-  const markedToday = records.some((r) => r.date === today);
+  const todayRecord = records.find((r) => r.date === today);
 
-  return NextResponse.json({ records, markedToday });
+  return NextResponse.json({ records, markedToday: !!todayRecord, todayRecord: todayRecord || null });
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  await initPromise;
 
   const today = new Date().toISOString().split("T")[0];
   const now = new Date().toISOString();
 
-  // Check if already marked
+  const body = await request.json().catch(() => ({}));
+  const status: string = body.status === "in_progress" ? "in_progress" : "completed";
+  const notes: string | null = typeof body.notes === "string" && body.notes.trim() ? body.notes.trim() : null;
+
+  // Check if already reported
   const existing = await db
     .select()
     .from(attendance)
@@ -62,18 +71,19 @@ export async function POST() {
     .get();
 
   if (existing) {
-    return NextResponse.json({ error: "Already marked for today" }, { status: 409 });
+    return NextResponse.json({ error: "Already reported for today" }, { status: 409 });
   }
 
-  await db
-    .insert(attendance)
-    .values({
-      id: crypto.randomUUID(),
-      userId: user.id,
-      date: today,
-      markedAt: now,
-    })
-    .run();
+  const record = {
+    id: crypto.randomUUID(),
+    userId: user.id,
+    date: today,
+    markedAt: now,
+    status,
+    notes,
+  };
 
-  return NextResponse.json({ success: true, date: today });
+  await db.insert(attendance).values(record).run();
+
+  return NextResponse.json({ success: true, date: today, status, notes });
 }

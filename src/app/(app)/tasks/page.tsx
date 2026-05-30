@@ -5,6 +5,7 @@ import { tasks, clients } from "@/db/schema";
 import { or, eq, desc } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { InlineCreateForm } from "@/components/inline-create-form";
 
 const PRIORITY_ORDER: Record<string, number> = {
   urgent: 0,
@@ -51,11 +52,37 @@ export default async function TasksPage() {
       (PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99)
   );
 
+  const clientOptions = allClients
+    .filter((c) => !c.archivedAt)
+    .map((c) => ({ value: c.id, label: c.name }));
+
   return (
     <div className="max-w-5xl mx-auto px-6 py-10">
-      <div className="flex items-center gap-3 mb-1">
-        <CheckSquare className="w-6 h-6 text-[var(--ink-muted)]" strokeWidth={1.5} />
-        <h1 className="text-3xl font-serif font-semibold">Open tasks</h1>
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-3">
+          <CheckSquare className="w-6 h-6 text-[var(--ink-muted)]" strokeWidth={1.5} />
+          <h1 className="text-3xl font-serif font-semibold">Open tasks</h1>
+        </div>
+        <InlineCreateForm
+          buttonLabel="New task"
+          apiEndpoint="/api/tasks"
+          fields={[
+            { name: "title", label: "Title", type: "text", required: true, placeholder: "Task title" },
+            { name: "clientId", label: "Client", type: "select", options: clientOptions },
+            {
+              name: "priority",
+              label: "Priority",
+              type: "select",
+              options: [
+                { value: "low", label: "Low" },
+                { value: "medium", label: "Medium" },
+                { value: "high", label: "High" },
+                { value: "urgent", label: "Urgent" },
+              ],
+            },
+            { name: "dueDate", label: "Due date", type: "date" },
+          ]}
+        />
       </div>
       <p className="text-[var(--ink-muted)] mb-8">
         All tasks with status <span className="font-medium">todo</span> or{" "}

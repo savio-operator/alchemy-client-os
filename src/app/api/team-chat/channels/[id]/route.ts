@@ -27,19 +27,28 @@ export async function PATCH(
   if (!channel) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await request.json();
-  const { name } = body as { name: string };
+  const { name, description, isPrivate } = body as { name?: string; description?: string; isPrivate?: boolean };
 
-  if (!name?.trim()) {
-    return NextResponse.json({ error: "Name required" }, { status: 400 });
+  const updates: Partial<{ name: string; description: string; isPrivate: boolean }> = {};
+
+  if (name !== undefined) {
+    if (!name.trim()) return NextResponse.json({ error: "Name required" }, { status: 400 });
+    updates.name = name.trim();
+  }
+  if (description !== undefined) updates.description = description;
+  if (isPrivate !== undefined) updates.isPrivate = isPrivate;
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: "No fields to update" }, { status: 400 });
   }
 
   await db
     .update(chatChannels)
-    .set({ name: name.trim() })
+    .set(updates)
     .where(eq(chatChannels.id, channelId))
     .run();
 
-  return NextResponse.json({ ...channel, name: name.trim() });
+  return NextResponse.json({ ...channel, ...updates });
 }
 
 export async function DELETE(

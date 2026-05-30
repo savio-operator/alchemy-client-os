@@ -98,15 +98,15 @@ export async function POST(request: Request) {
     type?: string;
   };
 
-  // Creating a named group channel
-  if (channelType === "group" && name) {
+  // Creating a named group or voice channel
+  if ((channelType === "group" || channelType === "voice") && name) {
     if (user.role !== "founder" && user.role !== "manager") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const channelId = crypto.randomUUID();
     const now = new Date().toISOString();
-    await db.insert(chatChannels).values({ id: channelId, type: "group", name: name.trim(), createdAt: now }).run();
+    await db.insert(chatChannels).values({ id: channelId, type: channelType, name: name.trim(), createdAt: now }).run();
 
     // Add all active users
     const activeUsers = await db.select().from(users).where(eq(users.status, "active")).all();
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
       await db.insert(chatChannelMembers).values({ channelId, userId: u.id, joinedAt: now }).run();
     }
 
-    return NextResponse.json({ id: channelId, type: "group", name: name.trim(), createdAt: now });
+    return NextResponse.json({ id: channelId, type: channelType, name: name.trim(), createdAt: now });
   }
 
   if (!targetUserId) {

@@ -5,6 +5,7 @@ import { leads } from "@/db/schema";
 import { desc } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { InlineCreateForm } from "@/components/inline-create-form";
 
 const STATUS_COLORS: Record<string, string> = {
   new: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
@@ -52,9 +53,32 @@ export default async function LeadsPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-10">
-      <div className="flex items-center gap-3 mb-1">
-        <Compass className="w-6 h-6 text-[var(--ink-muted)]" strokeWidth={1.5} />
-        <h1 className="text-3xl font-serif font-semibold">Leads</h1>
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-3">
+          <Compass className="w-6 h-6 text-[var(--ink-muted)]" strokeWidth={1.5} />
+          <h1 className="text-3xl font-serif font-semibold">Leads</h1>
+        </div>
+        <InlineCreateForm
+          buttonLabel="New lead"
+          apiEndpoint="/api/leads"
+          fields={[
+            { name: "name", label: "Name", type: "text", required: true, placeholder: "Contact name" },
+            { name: "company", label: "Company", type: "text", placeholder: "Company name" },
+            { name: "email", label: "Email", type: "text", placeholder: "email@example.com" },
+            { name: "phone", label: "Phone", type: "text", placeholder: "+91 99999 99999" },
+            {
+              name: "source",
+              label: "Source",
+              type: "select",
+              options: [
+                { value: "referral", label: "Referral" },
+                { value: "inbound", label: "Inbound" },
+                { value: "outbound", label: "Outbound" },
+                { value: "social", label: "Social" },
+              ],
+            },
+          ]}
+        />
       </div>
       <p className="text-[var(--ink-muted)] mb-8">
         All potential clients and business opportunities.

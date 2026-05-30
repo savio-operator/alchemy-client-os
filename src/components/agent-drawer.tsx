@@ -164,12 +164,12 @@ export function AgentDrawer() {
         toolCalls: data.toolCalls ? JSON.stringify(data.toolCalls) : null,
         createdAt: new Date().toISOString(),
       });
-    } catch {
+    } catch (err) {
       addMessage({
         id: `err-${Date.now()}`,
         conversationId: activeConversationId || "",
         role: "assistant",
-        content: "Connection error. Please try again.",
+        content: err instanceof Error ? err.message : "Connection error. Please try again.",
         createdAt: new Date().toISOString(),
       });
     } finally {

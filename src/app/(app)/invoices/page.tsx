@@ -5,6 +5,7 @@ import { invoices, clients } from "@/db/schema";
 import { or, eq, desc } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { InlineCreateForm } from "@/components/inline-create-form";
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
@@ -45,11 +46,38 @@ export default async function InvoicesPage() {
     0
   );
 
+  const clientOptions = allClients
+    .filter((c) => !c.archivedAt)
+    .map((c) => ({ value: c.id, label: c.name }));
+
   return (
     <div className="max-w-5xl mx-auto px-6 py-10">
-      <div className="flex items-center gap-3 mb-1">
-        <Receipt className="w-6 h-6 text-[var(--ink-muted)]" strokeWidth={1.5} />
-        <h1 className="text-3xl font-serif font-semibold">Pending invoices</h1>
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-3">
+          <Receipt className="w-6 h-6 text-[var(--ink-muted)]" strokeWidth={1.5} />
+          <h1 className="text-3xl font-serif font-semibold">Pending invoices</h1>
+        </div>
+        <InlineCreateForm
+          buttonLabel="New invoice"
+          apiEndpoint="/api/invoices"
+          fields={[
+            { name: "clientId", label: "Client", type: "select", required: true, options: clientOptions },
+            { name: "number", label: "Invoice #", type: "text", required: true, placeholder: "INV-001" },
+            { name: "amount", label: "Amount", type: "number", required: true, placeholder: "0" },
+            {
+              name: "currency",
+              label: "Currency",
+              type: "select",
+              options: [
+                { value: "INR", label: "INR" },
+                { value: "USD", label: "USD" },
+                { value: "EUR", label: "EUR" },
+              ],
+            },
+            { name: "dueDate", label: "Due date", type: "date" },
+            { name: "description", label: "Description", type: "text", placeholder: "Brief description" },
+          ]}
+        />
       </div>
       <p className="text-[var(--ink-muted)] mb-8">
         Invoices with status <span className="font-medium">sent</span> or{" "}

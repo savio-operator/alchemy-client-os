@@ -37,6 +37,18 @@ export type EnrichedChannel = ChatChannel & {
   displayName?: string;
 };
 
+export interface PollData {
+  id: string;
+  channelId: string;
+  messageId: string;
+  question: string;
+  options: string[];
+  voteCounts: number[];
+  totalVotes: number;
+  myVote: number | null;
+  createdAt: string;
+}
+
 interface TeamChatState {
   activeChannelId: string | null;
   channels: EnrichedChannel[];
@@ -53,6 +65,12 @@ interface TeamChatState {
   showMemberList: boolean;
   showEmojiPicker: boolean;
   emojiPickerMessageId: string | null;
+  // Channel settings modal
+  channelSettingsId: string | null;
+  // AI mode
+  aiMode: boolean;
+  // Polls cache
+  polls: Record<string, PollData>; // pollId -> poll
 
   // Actions
   setActiveChannel: (id: string | null) => void;
@@ -73,6 +91,9 @@ interface TeamChatState {
   setShowEmojiPicker: (show: boolean, messageId?: string | null) => void;
   markChannelRead: (channelId: string) => void;
   incrementUnread: (channelId: string) => void;
+  setChannelSettingsId: (id: string | null) => void;
+  setAiMode: (on: boolean) => void;
+  setPoll: (pollId: string, data: PollData) => void;
 }
 
 export const useTeamChat = create<TeamChatState>((set) => ({
@@ -91,6 +112,9 @@ export const useTeamChat = create<TeamChatState>((set) => ({
   showMemberList: true,
   showEmojiPicker: false,
   emojiPickerMessageId: null,
+  channelSettingsId: null,
+  aiMode: false,
+  polls: {},
 
   setActiveChannel: (id) => set({ activeChannelId: id, replyingTo: null, editingMessageId: null }),
   setChannels: (channels) => set({ channels }),
@@ -145,4 +169,8 @@ export const useTeamChat = create<TeamChatState>((set) => ({
         c.id === channelId ? { ...c, unread: (c.unread ?? 0) + 1 } : c
       ),
     })),
+  setChannelSettingsId: (id) => set({ channelSettingsId: id }),
+  setAiMode: (on) => set({ aiMode: on }),
+  setPoll: (pollId, data) =>
+    set((state) => ({ polls: { ...state.polls, [pollId]: data } })),
 }));

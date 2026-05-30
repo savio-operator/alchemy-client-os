@@ -24,7 +24,6 @@ import {
   Trash2,
   MoreHorizontal,
   Smile,
-  Paperclip,
   Send,
   X,
   Users,
@@ -34,35 +33,22 @@ import {
   Italic,
   Code,
   Loader2,
+  Bot,
+  BarChart2,
+  Upload,
+  Bell,
+  BellOff,
+  Lock,
+  Globe,
+  UserPlus,
+  ChevronUp,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/store/user";
-import { useTeamChat, type EnrichedMessage, type EnrichedChannel } from "@/store/team-chat";
+import { useTeamChat, type EnrichedMessage, type EnrichedChannel, type PollData } from "@/store/team-chat";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Avatar helpers ────────────────────────────────────────────────────────────
 
-const DISCORD_COLORS = {
-  sidebar: "#2b2d31",
-  sidebarDark: "#1e1f22",
-  content: "#313338",
-  input: "#383a40",
-  inputBorder: "#1e1f22",
-  text: "#dbdee1",
-  textMuted: "#949ba4",
-  textLink: "#00a8fc",
-  accent: "#5865f2",
-  accentHover: "#4752c4",
-  online: "#23a55a",
-  idle: "#f0b132",
-  dnd: "#f23f43",
-  offline: "#80848e",
-  hover: "rgba(255,255,255,0.06)",
-  active: "rgba(255,255,255,0.1)",
-  divider: "rgba(255,255,255,0.06)",
-  mention: "rgba(88,101,242,0.15)",
-};
-
-// Deterministic color from userId
 function avatarColor(userId: string): string {
   const colors = [
     "#5865f2", "#57f287", "#fee75c", "#eb459e",
@@ -76,17 +62,11 @@ function avatarColor(userId: string): string {
 }
 
 function initials(name: string): string {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 }
 
 function formatTime(isoString: string): string {
-  const date = new Date(isoString);
-  return date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  return new Date(isoString).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 }
 
 function formatDateSeparator(isoString: string): string {
@@ -94,7 +74,6 @@ function formatDateSeparator(isoString: string): string {
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-
   if (date.toDateString() === today.toDateString()) return "Today";
   if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
   return date.toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
@@ -104,35 +83,23 @@ function isSameDay(a: string, b: string): boolean {
   return new Date(a).toDateString() === new Date(b).toDateString();
 }
 
-const COMMON_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡", "🎉", "🔥", "👀", "✅"];
+const COMMON_EMOJIS_BY_CATEGORY: Record<string, string[]> = {
+  "Smileys": ["😀", "😂", "😍", "😎", "😢", "😡", "😮", "🥹", "🤣", "🥰", "😏", "🤔"],
+  "Gestures": ["👍", "👎", "👏", "🙌", "🤝", "✌️", "🤞", "👌", "🫡", "🙏"],
+  "Objects": ["🔥", "💯", "🎉", "✅", "❌", "⚡", "💡", "🎯", "🚀", "👀", "💬", "📌"],
+};
+const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡", "🎉", "🔥", "👀", "✅"];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function Avatar({
-  userId,
-  name,
-  size = 32,
-}: {
-  userId: string;
-  name: string;
-  size?: number;
-}) {
+function Avatar({ userId, name, size = 32 }: { userId: string; name: string; size?: number }) {
   const color = avatarColor(userId);
   return (
     <div
       style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        backgroundColor: color,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-        fontSize: size * 0.35,
-        fontWeight: 600,
-        color: "#fff",
-        userSelect: "none",
+        width: size, height: size, borderRadius: "50%", backgroundColor: color,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        flexShrink: 0, fontSize: size * 0.35, fontWeight: 600, color: "#fff", userSelect: "none",
       }}
     >
       {initials(name)}
@@ -142,23 +109,560 @@ function Avatar({
 
 function StatusDot({ status }: { status: string }) {
   const colorMap: Record<string, string> = {
-    online: DISCORD_COLORS.online,
-    idle: DISCORD_COLORS.idle,
-    dnd: DISCORD_COLORS.dnd,
-    offline: DISCORD_COLORS.offline,
+    online: "#23a55a",
+    idle: "#f0b132",
+    dnd: "#f23f43",
+    offline: "#80848e",
   };
   return (
     <span
       style={{
-        display: "inline-block",
-        width: 10,
-        height: 10,
-        borderRadius: "50%",
-        backgroundColor: colorMap[status] || DISCORD_COLORS.offline,
-        border: `2px solid ${DISCORD_COLORS.sidebarDark}`,
-        flexShrink: 0,
+        display: "inline-block", width: 10, height: 10, borderRadius: "50%",
+        backgroundColor: colorMap[status] || "#80848e",
+        border: "2px solid var(--bg)", flexShrink: 0,
       }}
     />
+  );
+}
+
+// ─── Poll Component ───────────────────────────────────────────────────────────
+
+function PollMessage({ pollId, currentUserId }: { pollId: string; currentUserId?: string }) {
+  const { polls, setPoll } = useTeamChat();
+  const poll = polls[pollId];
+  const [voting, setVoting] = useState(false);
+
+  useEffect(() => {
+    if (!poll) {
+      fetch(`/api/team-chat/polls/${pollId}`)
+        .then((r) => r.json())
+        .then((data) => setPoll(pollId, data))
+        .catch(() => {});
+    }
+  }, [pollId, poll, setPoll]);
+
+  const handleVote = async (optionIndex: number) => {
+    if (voting || !currentUserId) return;
+    setVoting(true);
+    try {
+      const res = await fetch(`/api/team-chat/polls/${pollId}/vote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ optionIndex }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPoll(pollId, { ...poll!, ...data });
+      }
+    } finally {
+      setVoting(false);
+    }
+  };
+
+  if (!poll) {
+    return (
+      <div className="flex items-center gap-2 text-[var(--ink-muted)] text-sm py-1">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        <span>Loading poll...</span>
+      </div>
+    );
+  }
+
+  const maxVotes = Math.max(...poll.voteCounts, 1);
+
+  return (
+    <div className="mt-1 rounded-lg border border-[var(--rule)] bg-[var(--bg)] p-3 max-w-sm">
+      <div className="flex items-center gap-2 mb-2">
+        <BarChart2 className="w-4 h-4 text-[var(--accent-clay)]" />
+        <span className="text-sm font-medium text-[var(--ink)]">{poll.question}</span>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {poll.options.map((opt, i) => {
+          const pct = poll.totalVotes > 0 ? Math.round((poll.voteCounts[i] / poll.totalVotes) * 100) : 0;
+          const isMyVote = poll.myVote === i;
+          return (
+            <button
+              key={i}
+              onClick={() => handleVote(i)}
+              disabled={voting}
+              className="relative w-full rounded text-left text-sm overflow-hidden"
+              style={{ border: isMyVote ? "1px solid var(--accent-clay)" : "1px solid var(--rule)" }}
+            >
+              <div
+                className="absolute inset-y-0 left-0 opacity-20 transition-all"
+                style={{ width: `${pct}%`, background: "var(--accent-clay)" }}
+              />
+              <div className="relative flex items-center justify-between px-2 py-1.5">
+                <span className="text-[var(--ink)]">{opt}</span>
+                <span className="text-xs text-[var(--ink-muted)]">{pct}%</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-xs text-[var(--ink-muted)] mt-2">{poll.totalVotes} vote{poll.totalVotes !== 1 ? "s" : ""}</p>
+    </div>
+  );
+}
+
+// ─── Channel Settings Modal ────────────────────────────────────────────────────
+
+function ChannelSettingsModal({
+  channel,
+  members,
+  teamUsers,
+  onClose,
+  onSaved,
+}: {
+  channel: EnrichedChannel;
+  members: Array<{ userId: string; name: string; role: string }>;
+  teamUsers: Array<{ id: string; name: string; role: string }>;
+  onClose: () => void;
+  onSaved: (updated: Partial<EnrichedChannel>) => void;
+}) {
+  const [tab, setTab] = useState<"overview" | "permissions" | "invites">("overview");
+  const [name, setName] = useState(channel.name || "");
+  const [description, setDescription] = useState((channel as EnrichedChannel & { description?: string }).description || "");
+  const [isPrivate, setIsPrivate] = useState((channel as EnrichedChannel & { isPrivate?: boolean }).isPrivate ?? false);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/team-chat/channels/${channel.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description, isPrivate }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        onSaved(updated);
+        onClose();
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.6)" }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="rounded-xl border border-[var(--rule)] bg-[var(--surface)] shadow-2xl w-[480px] max-h-[80vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--rule)]">
+          <h2 className="font-semibold text-[var(--ink)]">
+            Channel Settings — #{channel.name}
+          </h2>
+          <button onClick={onClose} className="text-[var(--ink-muted)] hover:text-[var(--ink)]">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 px-5 pt-3 border-b border-[var(--rule)]">
+          {(["overview", "permissions", "invites"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className="px-3 py-1.5 text-sm rounded-t-md capitalize transition-colors"
+              style={{
+                borderBottom: tab === t ? "2px solid var(--accent-clay)" : "2px solid transparent",
+                color: tab === t ? "var(--ink)" : "var(--ink-muted)",
+                fontWeight: tab === t ? 600 : 400,
+              }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5">
+          {tab === "overview" && (
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1 uppercase tracking-wider">
+                  Channel Name
+                </label>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--rule)]">
+                  <Hash className="w-4 h-4 text-[var(--ink-muted)]" />
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="flex-1 bg-transparent outline-none text-sm text-[var(--ink)]"
+                    placeholder="channel-name"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--ink-muted)] mb-1 uppercase tracking-wider">
+                  Description
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--rule)] text-sm text-[var(--ink)] outline-none resize-none placeholder:text-[var(--ink-muted)]"
+                  placeholder="What is this channel about?"
+                />
+              </div>
+            </div>
+          )}
+
+          {tab === "permissions" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg)] border border-[var(--rule)]">
+                <div className="flex items-center gap-3">
+                  {isPrivate ? (
+                    <Lock className="w-5 h-5 text-[var(--accent-clay)]" />
+                  ) : (
+                    <Globe className="w-5 h-5 text-[var(--ink-muted)]" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-[var(--ink)]">
+                      {isPrivate ? "Private Channel" : "Public Channel"}
+                    </p>
+                    <p className="text-xs text-[var(--ink-muted)]">
+                      {isPrivate ? "Only invited members can see this channel" : "All team members can access this channel"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsPrivate(!isPrivate)}
+                  className="relative w-10 h-6 rounded-full transition-colors"
+                  style={{ background: isPrivate ? "var(--accent-clay)" : "var(--rule)" }}
+                >
+                  <span
+                    className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
+                    style={{ transform: isPrivate ? "translateX(18px)" : "translateX(2px)" }}
+                  />
+                </button>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-[var(--ink-muted)] uppercase tracking-wider mb-2">
+                  Members with access
+                </p>
+                <div className="flex flex-col gap-1">
+                  {members.map((m) => (
+                    <div key={m.userId} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[var(--muted)]">
+                      <Avatar userId={m.userId} name={m.name} size={28} />
+                      <span className="text-sm text-[var(--ink)] flex-1">{m.name}</span>
+                      <span className="text-xs text-[var(--ink-muted)]">{m.role}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === "invites" && (
+            <div className="flex flex-col gap-3">
+              <p className="text-xs font-medium text-[var(--ink-muted)] uppercase tracking-wider">
+                Current Members ({members.length})
+              </p>
+              {members.map((m) => (
+                <div key={m.userId} className="flex items-center gap-2 px-2 py-1.5 rounded-lg">
+                  <Avatar userId={m.userId} name={m.name} size={28} />
+                  <span className="text-sm text-[var(--ink)] flex-1">{m.name}</span>
+                  <span className="text-xs text-[var(--ink-muted)] px-2 py-0.5 rounded bg-[var(--muted)]">{m.role}</span>
+                </div>
+              ))}
+              <div className="mt-2 pt-2 border-t border-[var(--rule)]">
+                <p className="text-xs font-medium text-[var(--ink-muted)] uppercase tracking-wider mb-2">
+                  Add Members
+                </p>
+                <div className="flex flex-col gap-1">
+                  {teamUsers
+                    .filter((u) => !members.find((m) => m.userId === u.id))
+                    .map((u) => (
+                      <div key={u.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[var(--muted)]">
+                        <Avatar userId={u.id} name={u.name} size={28} />
+                        <span className="text-sm text-[var(--ink)] flex-1">{u.name}</span>
+                        <button className="text-xs text-[var(--accent-clay)] flex items-center gap-1 hover:opacity-80">
+                          <UserPlus className="w-3.5 h-3.5" />
+                          Invite
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {tab !== "invites" && (
+          <div className="flex gap-2 px-5 py-3 border-t border-[var(--rule)]">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-1 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90"
+              style={{ background: "var(--accent-clay)" }}
+            >
+              {saving ? "Saving..." : "Save Changes"}
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 py-2 rounded-lg text-sm font-medium text-[var(--ink-muted)] bg-[var(--muted)] hover:bg-[var(--rule)] transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── Plus Menu ────────────────────────────────────────────────────────────────
+
+function PlusMenu({
+  onUpload,
+  onPoll,
+  onAiMode,
+  onEmoji,
+  aiMode,
+  onClose,
+}: {
+  onUpload: () => void;
+  onPoll: () => void;
+  onAiMode: () => void;
+  onEmoji: () => void;
+  aiMode: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 8, scale: 0.95 }}
+      className="absolute bottom-full mb-2 left-0 z-30 rounded-xl border border-[var(--rule)] bg-[var(--bg)] shadow-xl overflow-hidden min-w-[180px]"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        onClick={() => { onUpload(); onClose(); }}
+        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--ink)] hover:bg-[var(--muted)] transition-colors text-left"
+      >
+        <Upload className="w-4 h-4 text-[var(--ink-muted)]" />
+        Upload Files
+      </button>
+      <button
+        onClick={() => { onPoll(); onClose(); }}
+        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--ink)] hover:bg-[var(--muted)] transition-colors text-left"
+      >
+        <BarChart2 className="w-4 h-4 text-[var(--ink-muted)]" />
+        Create Poll
+      </button>
+      <button
+        onClick={() => { onAiMode(); onClose(); }}
+        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[var(--muted)] transition-colors text-left"
+        style={{ color: aiMode ? "var(--accent-clay)" : "var(--ink)" }}
+      >
+        <Bot className="w-4 h-4" style={{ color: aiMode ? "var(--accent-clay)" : "var(--ink-muted)" }} />
+        Ask AI {aiMode && <span className="ml-auto text-xs text-[var(--accent-clay)]">ON</span>}
+      </button>
+      <button
+        onClick={() => { onEmoji(); onClose(); }}
+        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--ink)] hover:bg-[var(--muted)] transition-colors text-left"
+      >
+        <Smile className="w-4 h-4 text-[var(--ink-muted)]" />
+        Emoji
+      </button>
+    </motion.div>
+  );
+}
+
+// ─── Poll Creation Form ───────────────────────────────────────────────────────
+
+function PollCreator({
+  onSubmit,
+  onCancel,
+}: {
+  onSubmit: (question: string, options: string[]) => void;
+  onCancel: () => void;
+}) {
+  const [question, setQuestion] = useState("");
+  const [options, setOptions] = useState(["", ""]);
+
+  const addOption = () => {
+    if (options.length < 5) setOptions([...options, ""]);
+  };
+
+  const updateOption = (i: number, val: string) => {
+    setOptions(options.map((o, idx) => (idx === i ? val : o)));
+  };
+
+  const removeOption = (i: number) => {
+    if (options.length > 2) setOptions(options.filter((_, idx) => idx !== i));
+  };
+
+  const valid = question.trim() && options.filter((o) => o.trim()).length >= 2;
+
+  return (
+    <div className="rounded-xl border border-[var(--rule)] bg-[var(--bg)] p-3 mb-2">
+      <div className="flex items-center gap-2 mb-2">
+        <BarChart2 className="w-4 h-4 text-[var(--accent-clay)]" />
+        <span className="text-sm font-medium text-[var(--ink)]">New Poll</span>
+        <button onClick={onCancel} className="ml-auto text-[var(--ink-muted)] hover:text-[var(--ink)]">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+      <input
+        autoFocus
+        value={question}
+        onChange={(e) => setQuestion(e.target.value)}
+        placeholder="Ask a question..."
+        className="w-full px-2 py-1.5 rounded bg-[var(--surface)] border border-[var(--rule)] text-sm text-[var(--ink)] outline-none mb-2 placeholder:text-[var(--ink-muted)]"
+      />
+      {options.map((opt, i) => (
+        <div key={i} className="flex items-center gap-1 mb-1">
+          <input
+            value={opt}
+            onChange={(e) => updateOption(i, e.target.value)}
+            placeholder={`Option ${i + 1}`}
+            className="flex-1 px-2 py-1 rounded bg-[var(--surface)] border border-[var(--rule)] text-sm text-[var(--ink)] outline-none placeholder:text-[var(--ink-muted)]"
+          />
+          {options.length > 2 && (
+            <button onClick={() => removeOption(i)} className="text-[var(--ink-muted)] hover:text-[var(--ink)]">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      ))}
+      <div className="flex items-center gap-2 mt-2">
+        {options.length < 5 && (
+          <button
+            onClick={addOption}
+            className="text-xs text-[var(--ink-muted)] hover:text-[var(--ink)] flex items-center gap-1"
+          >
+            <Plus className="w-3 h-3" /> Add option
+          </button>
+        )}
+        <button
+          onClick={() => valid && onSubmit(question, options.filter((o) => o.trim()))}
+          disabled={!valid}
+          className="ml-auto px-3 py-1 rounded text-xs font-medium text-white transition-opacity disabled:opacity-40"
+          style={{ background: "var(--accent-clay)" }}
+        >
+          Create Poll
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Emoji Grid Picker ─────────────────────────────────────────────────────────
+
+function EmojiGridPicker({ onSelect, onClose }: { onSelect: (emoji: string) => void; onClose: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 8 }}
+      className="absolute bottom-full mb-2 right-0 z-30 rounded-xl border border-[var(--rule)] bg-[var(--bg)] shadow-xl p-3 w-[260px]"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium text-[var(--ink-muted)]">Emoji</span>
+        <button onClick={onClose} className="text-[var(--ink-muted)] hover:text-[var(--ink)]">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      {Object.entries(COMMON_EMOJIS_BY_CATEGORY).map(([cat, emojis]) => (
+        <div key={cat} className="mb-2">
+          <p className="text-[10px] uppercase tracking-wider text-[var(--ink-muted)] mb-1">{cat}</p>
+          <div className="flex flex-wrap gap-0.5">
+            {emojis.map((e) => (
+              <button
+                key={e}
+                onClick={() => onSelect(e)}
+                className="text-lg p-1 rounded hover:bg-[var(--muted)] hover:scale-125 transition-transform"
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </motion.div>
+  );
+}
+
+// ─── Channel Context Menu ──────────────────────────────────────────────────────
+
+function ChannelContextMenu({
+  channel,
+  pos,
+  canManage,
+  isMuted,
+  onOpenChat,
+  onSettings,
+  onMuteToggle,
+  onDelete,
+  onClose,
+}: {
+  channel: EnrichedChannel;
+  pos: { x: number; y: number };
+  canManage: boolean;
+  isMuted: boolean;
+  onOpenChat: () => void;
+  onSettings: () => void;
+  onMuteToggle: () => void;
+  onDelete?: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      className="fixed z-50 rounded-xl border border-[var(--rule)] bg-[var(--bg)] shadow-2xl py-1 min-w-[200px]"
+      style={{ left: Math.min(pos.x, window.innerWidth - 210), top: Math.min(pos.y, window.innerHeight - 250) }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        onClick={() => { onOpenChat(); onClose(); }}
+        className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--ink)] hover:bg-[var(--muted)] transition-colors text-left"
+      >
+        <Hash className="w-4 h-4 text-[var(--ink-muted)]" />
+        Open Chat
+      </button>
+      <button
+        onClick={() => { onMuteToggle(); onClose(); }}
+        className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--ink)] hover:bg-[var(--muted)] transition-colors text-left"
+      >
+        {isMuted ? <Bell className="w-4 h-4 text-[var(--ink-muted)]" /> : <BellOff className="w-4 h-4 text-[var(--ink-muted)]" />}
+        {isMuted ? "Unmute Notifications" : "Mute Notifications"}
+      </button>
+      {canManage && (
+        <button
+          onClick={() => { onSettings(); onClose(); }}
+          className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--ink)] hover:bg-[var(--muted)] transition-colors text-left"
+        >
+          <Settings className="w-4 h-4 text-[var(--ink-muted)]" />
+          Edit Channel
+        </button>
+      )}
+      {canManage && onDelete && channel.name !== "General" && (
+        <>
+          <div className="h-px my-1 bg-[var(--rule)]" />
+          <button
+            onClick={() => { onDelete(); onClose(); }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors text-left"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete Channel
+          </button>
+        </>
+      )}
+    </motion.div>
   );
 }
 
@@ -180,6 +684,8 @@ export default function TeamChatPage() {
     contextMenuPos,
     showEmojiPicker,
     emojiPickerMessageId,
+    channelSettingsId,
+    aiMode,
     setActiveChannel,
     setChannels,
     setMessages,
@@ -196,6 +702,8 @@ export default function TeamChatPage() {
     setShowEmojiPicker,
     markChannelRead,
     incrementUnread,
+    setChannelSettingsId,
+    setAiMode,
   } = useTeamChat();
 
   const [input, setInput] = useState("");
@@ -205,6 +713,7 @@ export default function TeamChatPage() {
   const [teamUsers, setTeamUsers] = useState<Array<{ id: string; name: string; role: string }>>([]);
   const [showNewChannel, setShowNewChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
+  const [newChannelType, setNewChannelType] = useState<"group" | "voice">("group");
   const [showNewDm, setShowNewDm] = useState(false);
   const [textChannelsOpen, setTextChannelsOpen] = useState(true);
   const [voiceChannelsOpen, setVoiceChannelsOpen] = useState(true);
@@ -213,7 +722,14 @@ export default function TeamChatPage() {
   const [deafened, setDeafened] = useState(false);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
-  const [typingTimeout, setTypingTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [showPollCreator, setShowPollCreator] = useState(false);
+  const [showEmojiGrid, setShowEmojiGrid] = useState(false);
+  const [mutedChannels, setMutedChannels] = useState<Set<string>>(new Set());
+  const [channelContextMenu, setChannelContextMenu] = useState<{
+    channel: EnrichedChannel;
+    pos: { x: number; y: number };
+  } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -221,7 +737,7 @@ export default function TeamChatPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const editInputRef = useRef<HTMLTextAreaElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const plusMenuRef = useRef<HTMLDivElement>(null);
 
   const isFounder = user?.role === "founder";
   const isManager = user?.role === "manager";
@@ -229,20 +745,20 @@ export default function TeamChatPage() {
 
   // ── Data loading ───────────────────────────────────────────────────────────
 
-  // Load channels
   useEffect(() => {
     fetch("/api/team-chat/channels")
       .then((r) => r.json())
       .then((data) => {
         setChannels(data);
         if (data.length > 0 && !activeChannelId) {
-          setActiveChannel(data[0].id);
+          // Default to first text channel
+          const first = data.find((c: EnrichedChannel) => c.type === "group") || data[0];
+          setActiveChannel(first.id);
         }
       })
       .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load team users for DMs / mentions
   useEffect(() => {
     fetch("/api/users")
       .then((r) => r.json())
@@ -255,14 +771,11 @@ export default function TeamChatPage() {
       .catch(() => {});
   }, []);
 
-  // Load presence
   useEffect(() => {
     const loadPresence = () => {
       fetch("/api/team-chat/presence")
         .then((r) => r.json())
-        .then((data) => {
-          if (Array.isArray(data)) setOnlineUsers(data);
-        })
+        .then((data) => { if (Array.isArray(data)) setOnlineUsers(data); })
         .catch(() => {});
     };
     loadPresence();
@@ -270,7 +783,6 @@ export default function TeamChatPage() {
     return () => clearInterval(interval);
   }, [setOnlineUsers]);
 
-  // Update own presence
   useEffect(() => {
     if (!user) return;
     fetch("/api/team-chat/presence", {
@@ -280,11 +792,10 @@ export default function TeamChatPage() {
     }).catch(() => {});
 
     const handleVisibility = () => {
-      const status = document.hidden ? "idle" : "online";
       fetch("/api/team-chat/presence", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status: document.hidden ? "idle" : "online" }),
       }).catch(() => {});
     };
 
@@ -299,7 +810,6 @@ export default function TeamChatPage() {
     };
   }, [user]);
 
-  // Load messages when channel changes
   useEffect(() => {
     if (!activeChannelId) return;
     fetch(`/api/team-chat/channels/${activeChannelId}/messages`)
@@ -311,21 +821,16 @@ export default function TeamChatPage() {
       .catch(() => {});
   }, [activeChannelId, setMessages, markChannelRead]);
 
-  // Load channel members when channel changes
   useEffect(() => {
     if (!activeChannelId) return;
     fetch(`/api/team-chat/channels/${activeChannelId}/members`)
       .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setChannelMembers(activeChannelId, data);
-      })
+      .then((data) => { if (Array.isArray(data)) setChannelMembers(activeChannelId, data); })
       .catch(() => {});
   }, [activeChannelId, setChannelMembers]);
 
-  // SSE for real-time
   useEffect(() => {
     if (!activeChannelId) return;
-
     eventSourceRef.current?.close();
 
     const es = new EventSource(`/api/team-chat/channels/${activeChannelId}/stream`);
@@ -333,72 +838,69 @@ export default function TeamChatPage() {
       try {
         const msg = JSON.parse(event.data) as EnrichedMessage;
         addMessage(msg);
-        if (msg.userId !== user?.id) {
-          incrementUnread(activeChannelId);
-        }
-      } catch {
-        // ignore parse errors
-      }
+        if (msg.userId !== user?.id) incrementUnread(activeChannelId);
+      } catch { /* ignore */ }
     };
     es.onerror = () => {};
     eventSourceRef.current = es;
-
     return () => es.close();
   }, [activeChannelId, addMessage, incrementUnread, user?.id]);
 
-  // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // Close context menu on outside click
+  // Close context menus on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
         setSelectedMessage(null);
       }
+      setChannelContextMenu(null);
     };
-    if (selectedMessage) {
-      document.addEventListener("mousedown", handler);
-    }
+    document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [selectedMessage, setSelectedMessage]);
+  }, [setSelectedMessage]);
 
-  // ── Derived ─────────────────────────────────────────────────────────────────
+  // Close plus menu on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (plusMenuRef.current && !plusMenuRef.current.contains(e.target as Node)) {
+        setShowPlusMenu(false);
+      }
+    };
+    if (showPlusMenu) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showPlusMenu]);
 
-  const textChannels = useMemo(
-    () => channels.filter((c) => c.type === "group"),
-    [channels]
-  );
-  const voiceChannels = useMemo(
-    () => channels.filter((c) => c.type === "voice"),
-    [channels]
-  );
-  const dmChannels = useMemo(
-    () => channels.filter((c) => c.type === "direct"),
-    [channels]
-  );
+  // ── Derived ──────────────────────────────────────────────────────────────────
+
+  const textChannels = useMemo(() => channels.filter((c) => c.type === "group"), [channels]);
+  const voiceChannels = useMemo(() => channels.filter((c) => c.type === "voice"), [channels]);
+  const dmChannels = useMemo(() => channels.filter((c) => c.type === "direct"), [channels]);
   const activeChannel = channels.find((c) => c.id === activeChannelId);
 
   const currentMembers = activeChannelId ? channelMembers[activeChannelId] || [] : [];
   const onlineMembers = currentMembers.filter((m) => {
-    const presence = onlineUsers.find((u) => u.userId === m.userId);
-    return presence?.status === "online" || presence?.status === "idle" || presence?.status === "dnd";
+    const p = onlineUsers.find((u) => u.userId === m.userId);
+    return p?.status === "online" || p?.status === "idle" || p?.status === "dnd";
   });
   const offlineMembers = currentMembers.filter((m) => {
-    const presence = onlineUsers.find((u) => u.userId === m.userId);
-    return !presence || presence.status === "offline";
+    const p = onlineUsers.find((u) => u.userId === m.userId);
+    return !p || p.status === "offline";
   });
 
-  // Mention autocomplete
   const mentionSuggestions = useMemo(() => {
     if (mentionQuery === null) return [];
-    return teamUsers.filter((u) =>
-      u.name.toLowerCase().includes(mentionQuery.toLowerCase()) && u.id !== user?.id
-    ).slice(0, 8);
+    return teamUsers
+      .filter((u) => u.name.toLowerCase().includes(mentionQuery.toLowerCase()) && u.id !== user?.id)
+      .slice(0, 8);
   }, [mentionQuery, teamUsers, user?.id]);
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
+  const settingsChannel = channelSettingsId ? channels.find((c) => c.id === channelSettingsId) : null;
+  const settingsMembers = channelSettingsId ? (channelMembers[channelSettingsId] || []) : [];
+
+  // ── Handlers ─────────────────────────────────────────────────────────────────
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || sending || !activeChannelId) return;
@@ -406,110 +908,104 @@ export default function TeamChatPage() {
     const content = input.trim();
     setInput("");
     setSending(true);
+    setAiMode(false);
 
     try {
-      const body: Record<string, unknown> = { content };
-      if (replyingTo) body.replyToId = replyingTo.id;
-      setReplyingTo(null);
+      if (aiMode) {
+        // Post user message + ask AI
+        const body: Record<string, unknown> = { content };
+        if (replyingTo) body.replyToId = replyingTo.id;
+        setReplyingTo(null);
 
-      await fetch(`/api/team-chat/channels/${activeChannelId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-    } catch {
-      // Error sending
+        await fetch(`/api/team-chat/channels/${activeChannelId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        // Ask AI
+        const aiRes = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientId: "global", message: content }),
+        });
+        if (aiRes.ok) {
+          const aiData = await aiRes.json();
+          const aiReply = aiData.response || aiData.content || aiData.message || "";
+          if (aiReply) {
+            await fetch(`/api/team-chat/channels/${activeChannelId}/messages`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ content: `**AI:** ${aiReply}` }),
+            });
+          }
+        }
+      } else {
+        const body: Record<string, unknown> = { content };
+        if (replyingTo) body.replyToId = replyingTo.id;
+        setReplyingTo(null);
+
+        await fetch(`/api/team-chat/channels/${activeChannelId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      }
     } finally {
       setSending(false);
     }
-  }, [input, sending, activeChannelId, replyingTo, setReplyingTo]);
+  }, [input, sending, activeChannelId, replyingTo, setReplyingTo, aiMode, setAiMode]);
 
-  const handleEditSave = useCallback(
-    async (msgId: string) => {
-      if (!editInput.trim()) return;
-      try {
-        const res = await fetch(
-          `/api/team-chat/channels/${activeChannelId}/messages/${msgId}`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ content: editInput.trim() }),
-          }
-        );
-        if (res.ok) {
-          const updated = await res.json();
-          updateMessage(msgId, { content: updated.content, editedAt: updated.editedAt });
-        }
-      } catch {
-        //
+  const handleEditSave = useCallback(async (msgId: string) => {
+    if (!editInput.trim()) return;
+    try {
+      const res = await fetch(`/api/team-chat/channels/${activeChannelId}/messages/${msgId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: editInput.trim() }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        updateMessage(msgId, { content: updated.content, editedAt: updated.editedAt });
       }
-      setEditingMessageId(null);
-      setEditInput("");
-    },
-    [editInput, activeChannelId, updateMessage, setEditingMessageId]
-  );
+    } catch { /* */ }
+    setEditingMessageId(null);
+    setEditInput("");
+  }, [editInput, activeChannelId, updateMessage, setEditingMessageId]);
 
-  const handleDelete = useCallback(
-    async (msgId: string) => {
-      if (!confirm("Delete this message?")) return;
-      try {
-        const res = await fetch(
-          `/api/team-chat/channels/${activeChannelId}/messages/${msgId}`,
-          { method: "DELETE" }
-        );
-        if (res.ok) deleteMessage(msgId);
-      } catch {
-        //
-      }
-      setSelectedMessage(null);
-    },
-    [activeChannelId, deleteMessage, setSelectedMessage]
-  );
+  const handleDelete = useCallback(async (msgId: string) => {
+    if (!confirm("Delete this message?")) return;
+    try {
+      const res = await fetch(`/api/team-chat/channels/${activeChannelId}/messages/${msgId}`, { method: "DELETE" });
+      if (res.ok) deleteMessage(msgId);
+    } catch { /* */ }
+    setSelectedMessage(null);
+  }, [activeChannelId, deleteMessage, setSelectedMessage]);
 
-  const handlePin = useCallback(
-    async (msgId: string) => {
-      try {
-        await fetch(
-          `/api/team-chat/channels/${activeChannelId}/messages/${msgId}/pin`,
-          { method: "POST" }
-        );
-        // Refresh messages
-        const res = await fetch(`/api/team-chat/channels/${activeChannelId}/messages`);
-        const data = await res.json();
-        if (Array.isArray(data)) setMessages(data);
-      } catch {
-        //
-      }
-      setSelectedMessage(null);
-    },
-    [activeChannelId, setMessages, setSelectedMessage]
-  );
+  const handlePin = useCallback(async (msgId: string) => {
+    try {
+      await fetch(`/api/team-chat/channels/${activeChannelId}/messages/${msgId}/pin`, { method: "POST" });
+      const res = await fetch(`/api/team-chat/channels/${activeChannelId}/messages`);
+      const data = await res.json();
+      if (Array.isArray(data)) setMessages(data);
+    } catch { /* */ }
+    setSelectedMessage(null);
+  }, [activeChannelId, setMessages, setSelectedMessage]);
 
-  const handleReact = useCallback(
-    async (msgId: string, emoji: string) => {
-      try {
-        await fetch(
-          `/api/team-chat/channels/${activeChannelId}/messages/${msgId}/react`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ emoji }),
-          }
-        );
-        // Refresh reactions
-        const res = await fetch(
-          `/api/team-chat/channels/${activeChannelId}/messages/${msgId}/react`
-        );
-        const data = await res.json();
-        if (Array.isArray(data)) setReactions(msgId, data);
-      } catch {
-        //
-      }
-      setShowEmojiPicker(false);
-      setSelectedMessage(null);
-    },
-    [activeChannelId, setReactions, setShowEmojiPicker, setSelectedMessage]
-  );
+  const handleReact = useCallback(async (msgId: string, emoji: string) => {
+    try {
+      await fetch(`/api/team-chat/channels/${activeChannelId}/messages/${msgId}/react`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji }),
+      });
+      const res = await fetch(`/api/team-chat/channels/${activeChannelId}/messages/${msgId}/react`);
+      const data = await res.json();
+      if (Array.isArray(data)) setReactions(msgId, data);
+    } catch { /* */ }
+    setShowEmojiPicker(false);
+    setSelectedMessage(null);
+  }, [activeChannelId, setReactions, setShowEmojiPicker, setSelectedMessage]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -518,10 +1014,7 @@ export default function TeamChatPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const uploadRes = await fetch("/api/media/upload", {
-        method: "POST",
-        body: formData,
-      });
+      const uploadRes = await fetch("/api/media/upload", { method: "POST", body: formData });
       if (uploadRes.ok) {
         const { url, mediaType } = await uploadRes.json();
         await fetch(`/api/team-chat/channels/${activeChannelId}/messages`, {
@@ -530,8 +1023,6 @@ export default function TeamChatPage() {
           body: JSON.stringify({ content: "", mediaUrl: url, mediaType }),
         });
       }
-    } catch {
-      //
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -543,16 +1034,17 @@ export default function TeamChatPage() {
     const res = await fetch("/api/team-chat/channels", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "group", name: newChannelName.trim() }),
+      body: JSON.stringify({ type: newChannelType, name: newChannelName.trim() }),
     });
     if (res.ok) {
       const data = await res.json();
       const newChannels = await fetch("/api/team-chat/channels").then((r) => r.json());
       setChannels(newChannels);
-      setActiveChannel(data.id);
+      if (newChannelType === "group") setActiveChannel(data.id);
     }
     setShowNewChannel(false);
     setNewChannelName("");
+    setNewChannelType("group");
   };
 
   const handleCreateDm = async (targetUserId: string) => {
@@ -568,56 +1060,55 @@ export default function TeamChatPage() {
     setActiveChannel(data.id);
   };
 
+  const handleDeleteChannel = async (id: string) => {
+    if (!confirm("Delete channel?")) return;
+    const res = await fetch(`/api/team-chat/channels/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      const updated = await fetch("/api/team-chat/channels").then((r) => r.json());
+      setChannels(updated);
+      if (activeChannelId === id) setActiveChannel(updated[0]?.id || null);
+    }
+  };
+
+  const handleCreatePoll = async (question: string, options: string[]) => {
+    if (!activeChannelId) return;
+    setShowPollCreator(false);
+    try {
+      await fetch("/api/team-chat/polls", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channelId: activeChannelId, question, options }),
+      });
+    } catch { /* */ }
+  };
+
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Mention autocomplete nav
     if (mentionSuggestions.length > 0) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setMentionIndex((i) => Math.min(i + 1, mentionSuggestions.length - 1));
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setMentionIndex((i) => Math.max(i - 1, 0));
-        return;
-      }
+      if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex((i) => Math.min(i + 1, mentionSuggestions.length - 1)); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex((i) => Math.max(i - 1, 0)); return; }
       if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
-        const selected = mentionSuggestions[mentionIndex];
-        if (selected) {
+        const sel = mentionSuggestions[mentionIndex];
+        if (sel) {
           const atIdx = input.lastIndexOf("@");
-          const newInput = input.slice(0, atIdx) + `@${selected.name} `;
-          setInput(newInput);
+          setInput(input.slice(0, atIdx) + `@${sel.name} `);
           setMentionQuery(null);
           setMentionIndex(0);
         }
         return;
       }
-      if (e.key === "Escape") {
-        setMentionQuery(null);
-        return;
-      }
+      if (e.key === "Escape") { setMentionQuery(null); return; }
     }
-
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInput(val);
-
-    // Detect @mention
     const lastAt = val.lastIndexOf("@");
     if (lastAt >= 0) {
       const afterAt = val.slice(lastAt + 1);
-      if (!afterAt.includes(" ")) {
-        setMentionQuery(afterAt);
-        setMentionIndex(0);
-        return;
-      }
+      if (!afterAt.includes(" ")) { setMentionQuery(afterAt); setMentionIndex(0); return; }
     }
     setMentionQuery(null);
   };
@@ -630,10 +1121,7 @@ export default function TeamChatPage() {
     const selected = input.slice(start, end);
     const newVal = input.slice(0, start) + prefix + selected + suffix + input.slice(end);
     setInput(newVal);
-    setTimeout(() => {
-      ta.focus();
-      ta.setSelectionRange(start + prefix.length, end + prefix.length);
-    }, 0);
+    setTimeout(() => { ta.focus(); ta.setSelectionRange(start + prefix.length, end + prefix.length); }, 0);
   };
 
   const onContextMenu = (e: React.MouseEvent, msg: EnrichedMessage) => {
@@ -641,47 +1129,36 @@ export default function TeamChatPage() {
     setSelectedMessage(msg, { x: e.clientX, y: e.clientY });
   };
 
+  const handleChannelRightClick = (e: React.MouseEvent, ch: EnrichedChannel) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setChannelContextMenu({ channel: ch, pos: { x: e.clientX, y: e.clientY } });
+  };
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <div
-      className="flex h-screen overflow-hidden"
-      style={{ background: DISCORD_COLORS.content, color: DISCORD_COLORS.text, fontFamily: "inherit" }}
+      className="flex h-screen overflow-hidden bg-[var(--surface)] text-[var(--ink)]"
       onClick={() => {
         if (selectedMessage) setSelectedMessage(null);
         if (showEmojiPicker) setShowEmojiPicker(false);
+        setChannelContextMenu(null);
       }}
     >
       {/* ── Left Sidebar ── */}
-      <div
-        className="flex flex-col shrink-0 overflow-hidden"
-        style={{
-          width: 240,
-          background: DISCORD_COLORS.sidebar,
-          borderRight: `1px solid ${DISCORD_COLORS.divider}`,
-        }}
-      >
+      <div className="flex flex-col shrink-0 overflow-hidden w-60 bg-[var(--bg)] border-r border-[var(--rule)]">
         {/* Server header */}
-        <div
-          className="flex items-center justify-between px-4 h-12 shrink-0 font-semibold text-sm cursor-pointer"
-          style={{
-            borderBottom: `1px solid ${DISCORD_COLORS.divider}`,
-            color: DISCORD_COLORS.text,
-          }}
-        >
-          <span>Adchemy Team</span>
-          <ChevronDown className="w-4 h-4" style={{ color: DISCORD_COLORS.textMuted }} />
+        <div className="flex items-center justify-between px-4 h-12 shrink-0 font-semibold text-sm border-b border-[var(--rule)]">
+          <span className="text-[var(--ink)]">Adchemy Team</span>
+          <ChevronDown className="w-4 h-4 text-[var(--ink-muted)]" />
         </div>
 
         <div className="flex-1 overflow-y-auto py-2" style={{ scrollbarWidth: "thin" }}>
-
           {/* DMs */}
           {dmChannels.length > 0 && (
             <div className="mb-2">
-              <div
-                className="flex items-center px-4 py-1 text-xs font-semibold uppercase tracking-wider"
-                style={{ color: DISCORD_COLORS.textMuted }}
-              >
+              <div className="flex items-center px-4 py-1 text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
                 Direct Messages
               </div>
               {dmChannels.map((ch) => (
@@ -691,15 +1168,14 @@ export default function TeamChatPage() {
                   active={ch.id === activeChannelId}
                   icon={<AtSign className="w-4 h-4" strokeWidth={1.5} />}
                   onSelect={() => setActiveChannel(ch.id)}
-                  onlineUsers={onlineUsers}
-                  teamUsers={teamUsers}
-                  currentUserId={user?.id}
+                  onRightClick={(e) => handleChannelRightClick(e, ch)}
+                  onSettings={() => setChannelSettingsId(ch.id)}
+                  canManage={canManage}
                 />
               ))}
               <button
                 onClick={() => setShowNewDm(!showNewDm)}
-                className="w-full flex items-center gap-2 px-4 py-1.5 text-sm"
-                style={{ color: DISCORD_COLORS.textMuted }}
+                className="w-full flex items-center gap-2 px-4 py-1.5 text-sm text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>New DM</span>
@@ -710,23 +1186,15 @@ export default function TeamChatPage() {
           {/* Text Channels */}
           <div className="mb-2">
             <button
-              className="flex items-center gap-1 px-2 py-1 w-full text-xs font-semibold uppercase tracking-wider"
-              style={{ color: DISCORD_COLORS.textMuted }}
+              className="flex items-center gap-1 px-2 py-1 w-full text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors"
               onClick={() => setTextChannelsOpen((v) => !v)}
             >
-              {textChannelsOpen ? (
-                <ChevronDown className="w-3 h-3" />
-              ) : (
-                <ChevronRight className="w-3 h-3" />
-              )}
+              {textChannelsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
               <span>Text Channels</span>
               {canManage && (
                 <button
                   className="ml-auto p-0.5 rounded hover:opacity-80"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowNewChannel(true);
-                  }}
+                  onClick={(e) => { e.stopPropagation(); setShowNewChannel(true); setNewChannelType("group"); }}
                   title="Create channel"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -734,62 +1202,54 @@ export default function TeamChatPage() {
               )}
             </button>
 
-            {textChannelsOpen && (
-              <>
-                {textChannels.map((ch) => (
-                  <ChannelItem
-                    key={ch.id}
-                    channel={ch}
-                    active={ch.id === activeChannelId}
-                    icon={<Hash className="w-4 h-4" strokeWidth={1.5} />}
-                    onSelect={() => setActiveChannel(ch.id)}
-                    onlineUsers={onlineUsers}
-                    teamUsers={teamUsers}
-                    currentUserId={user?.id}
-                    canManage={canManage}
-                    isFounder={isFounder}
-                    onDeleteChannel={async (id) => {
-                      if (!confirm("Delete channel?")) return;
-                      const res = await fetch(`/api/team-chat/channels/${id}`, { method: "DELETE" });
-                      if (res.ok) {
-                        const updated = await fetch("/api/team-chat/channels").then((r) => r.json());
-                        setChannels(updated);
-                        if (activeChannelId === id) setActiveChannel(updated[0]?.id || null);
-                      }
-                    }}
-                  />
-                ))}
-              </>
-            )}
+            {textChannelsOpen && textChannels.map((ch) => (
+              <ChannelItem
+                key={ch.id}
+                channel={ch}
+                active={ch.id === activeChannelId}
+                icon={<Hash className="w-4 h-4" strokeWidth={1.5} />}
+                onSelect={() => setActiveChannel(ch.id)}
+                onRightClick={(e) => handleChannelRightClick(e, ch)}
+                onSettings={() => setChannelSettingsId(ch.id)}
+                canManage={canManage}
+                isMuted={mutedChannels.has(ch.id)}
+              />
+            ))}
           </div>
 
           {/* Voice Channels */}
           <div className="mb-2">
             <button
-              className="flex items-center gap-1 px-2 py-1 w-full text-xs font-semibold uppercase tracking-wider"
-              style={{ color: DISCORD_COLORS.textMuted }}
+              className="flex items-center gap-1 px-2 py-1 w-full text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors"
               onClick={() => setVoiceChannelsOpen((v) => !v)}
             >
-              {voiceChannelsOpen ? (
-                <ChevronDown className="w-3 h-3" />
-              ) : (
-                <ChevronRight className="w-3 h-3" />
-              )}
+              {voiceChannelsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
               <span>Voice Channels</span>
+              {canManage && (
+                <button
+                  className="ml-auto p-0.5 rounded hover:opacity-80"
+                  onClick={(e) => { e.stopPropagation(); setShowNewChannel(true); setNewChannelType("voice"); }}
+                  title="Create voice channel"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              )}
             </button>
-            {voiceChannelsOpen && (
-              <button
-                onClick={() => setConnectedVoice("general-voice")}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded mx-1"
-                style={{
-                  color: connectedVoice ? DISCORD_COLORS.online : DISCORD_COLORS.textMuted,
-                  background: connectedVoice ? DISCORD_COLORS.active : "transparent",
-                  width: "calc(100% - 8px)",
-                }}
-              >
-                <Volume2 className="w-4 h-4" strokeWidth={1.5} />
-                <span>General Voice</span>
-              </button>
+            {voiceChannelsOpen && voiceChannels.map((ch) => (
+              <ChannelItem
+                key={ch.id}
+                channel={ch}
+                active={connectedVoice === ch.id}
+                icon={<Volume2 className="w-4 h-4" strokeWidth={1.5} />}
+                onSelect={() => setConnectedVoice(connectedVoice === ch.id ? null : ch.id)}
+                onRightClick={(e) => handleChannelRightClick(e, ch)}
+                onSettings={() => setChannelSettingsId(ch.id)}
+                canManage={canManage}
+                isVoice
+              />
+            ))}
+            {voiceChannelsOpen && voiceChannels.length === 0 && (
+              <p className="text-xs text-[var(--ink-muted)] px-4 py-1">No voice channels</p>
             )}
           </div>
 
@@ -797,8 +1257,7 @@ export default function TeamChatPage() {
           {dmChannels.length === 0 && (
             <button
               onClick={() => setShowNewDm(!showNewDm)}
-              className="flex items-center gap-2 px-4 py-1.5 text-sm w-full"
-              style={{ color: DISCORD_COLORS.textMuted }}
+              className="flex items-center gap-2 px-4 py-1.5 text-sm w-full text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New DM</span>
@@ -813,12 +1272,34 @@ export default function TeamChatPage() {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="px-3 py-2 overflow-hidden"
-              style={{ borderTop: `1px solid ${DISCORD_COLORS.divider}` }}
+              className="px-3 py-2 overflow-hidden border-t border-[var(--rule)]"
             >
-              <p className="text-xs mb-1" style={{ color: DISCORD_COLORS.textMuted }}>
-                Create Text Channel
+              <p className="text-xs mb-1 text-[var(--ink-muted)]">
+                {newChannelType === "voice" ? "Create Voice Channel" : "Create Text Channel"}
               </p>
+              {/* Type selector */}
+              <div className="flex gap-1 mb-2">
+                <button
+                  onClick={() => setNewChannelType("group")}
+                  className="flex-1 py-1 rounded text-xs flex items-center justify-center gap-1"
+                  style={{
+                    background: newChannelType === "group" ? "var(--accent-clay)" : "var(--muted)",
+                    color: newChannelType === "group" ? "#fff" : "var(--ink-muted)",
+                  }}
+                >
+                  <Hash className="w-3 h-3" /> Text
+                </button>
+                <button
+                  onClick={() => setNewChannelType("voice")}
+                  className="flex-1 py-1 rounded text-xs flex items-center justify-center gap-1"
+                  style={{
+                    background: newChannelType === "voice" ? "var(--accent-clay)" : "var(--muted)",
+                    color: newChannelType === "voice" ? "#fff" : "var(--ink-muted)",
+                  }}
+                >
+                  <Volume2 className="w-3 h-3" /> Voice
+                </button>
+              </div>
               <input
                 autoFocus
                 value={newChannelName}
@@ -828,25 +1309,19 @@ export default function TeamChatPage() {
                   if (e.key === "Escape") setShowNewChannel(false);
                 }}
                 placeholder="channel-name"
-                className="w-full rounded px-2 py-1 text-sm outline-none"
-                style={{
-                  background: DISCORD_COLORS.input,
-                  color: DISCORD_COLORS.text,
-                  border: `1px solid ${DISCORD_COLORS.inputBorder}`,
-                }}
+                className="w-full rounded px-2 py-1 text-sm outline-none bg-[var(--bg)] border border-[var(--rule)] text-[var(--ink)] placeholder:text-[var(--ink-muted)]"
               />
               <div className="flex gap-1 mt-1">
                 <button
                   onClick={handleCreateChannel}
-                  className="flex-1 py-1 rounded text-xs font-medium"
-                  style={{ background: DISCORD_COLORS.accent, color: "#fff" }}
+                  className="flex-1 py-1 rounded text-xs font-medium text-white"
+                  style={{ background: "var(--accent-clay)" }}
                 >
                   Create
                 </button>
                 <button
-                  onClick={() => setShowNewChannel(false)}
-                  className="flex-1 py-1 rounded text-xs font-medium"
-                  style={{ background: DISCORD_COLORS.hover, color: DISCORD_COLORS.textMuted }}
+                  onClick={() => { setShowNewChannel(false); setNewChannelName(""); }}
+                  className="flex-1 py-1 rounded text-xs font-medium bg-[var(--muted)] text-[var(--ink-muted)]"
                 >
                   Cancel
                 </button>
@@ -862,12 +1337,9 @@ export default function TeamChatPage() {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="px-3 py-2 overflow-hidden"
-              style={{ borderTop: `1px solid ${DISCORD_COLORS.divider}` }}
+              className="px-3 py-2 overflow-hidden border-t border-[var(--rule)]"
             >
-              <p className="text-xs mb-1" style={{ color: DISCORD_COLORS.textMuted }}>
-                New Direct Message
-              </p>
+              <p className="text-xs mb-1 text-[var(--ink-muted)]">New Direct Message</p>
               <div className="max-h-40 overflow-y-auto">
                 {teamUsers
                   .filter((u) => u.id !== user?.id)
@@ -875,14 +1347,7 @@ export default function TeamChatPage() {
                     <button
                       key={u.id}
                       onClick={() => handleCreateDm(u.id)}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left"
-                      style={{ color: DISCORD_COLORS.text }}
-                      onMouseEnter={(e) =>
-                        ((e.currentTarget as HTMLButtonElement).style.background = DISCORD_COLORS.hover)
-                      }
-                      onMouseLeave={(e) =>
-                        ((e.currentTarget as HTMLButtonElement).style.background = "transparent")
-                      }
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left text-[var(--ink)] hover:bg-[var(--muted)] transition-colors"
                     >
                       <Avatar userId={u.id} name={u.name} size={24} />
                       <span className="truncate">{u.name}</span>
@@ -891,8 +1356,7 @@ export default function TeamChatPage() {
               </div>
               <button
                 onClick={() => setShowNewDm(false)}
-                className="w-full mt-1 py-0.5 rounded text-xs"
-                style={{ color: DISCORD_COLORS.textMuted }}
+                className="w-full mt-1 py-0.5 rounded text-xs text-[var(--ink-muted)]"
               >
                 Cancel
               </button>
@@ -902,40 +1366,24 @@ export default function TeamChatPage() {
 
         {/* User info bar at bottom */}
         {user && (
-          <div
-            className="flex items-center gap-2 px-2 py-2 shrink-0"
-            style={{
-              background: DISCORD_COLORS.sidebarDark,
-              borderTop: `1px solid ${DISCORD_COLORS.divider}`,
-            }}
-          >
+          <div className="flex items-center gap-2 px-2 py-2 shrink-0 bg-[var(--bg)] border-t border-[var(--rule)]">
             <div className="relative">
               <Avatar userId={user.id} name={user.name} size={32} />
               <span
                 className="absolute -bottom-0.5 -right-0.5"
-                style={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: "50%",
-                  background: DISCORD_COLORS.online,
-                  border: `2px solid ${DISCORD_COLORS.sidebarDark}`,
-                }}
+                style={{ width: 12, height: 12, borderRadius: "50%", background: "#23a55a", border: "2px solid var(--bg)" }}
               />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate" style={{ color: DISCORD_COLORS.text }}>
-                {user.name}
-              </p>
-              <p className="text-xs truncate" style={{ color: DISCORD_COLORS.textMuted }}>
-                {user.role}
-              </p>
+              <p className="text-sm font-medium truncate text-[var(--ink)]">{user.name}</p>
+              <p className="text-xs truncate text-[var(--ink-muted)]">{user.role}</p>
             </div>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setMuted(!muted)}
                 className="p-1 rounded"
                 title={muted ? "Unmute" : "Mute"}
-                style={{ color: muted ? DISCORD_COLORS.dnd : DISCORD_COLORS.textMuted }}
+                style={{ color: muted ? "#f23f43" : "var(--ink-muted)" }}
               >
                 {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
               </button>
@@ -943,7 +1391,7 @@ export default function TeamChatPage() {
                 onClick={() => setDeafened(!deafened)}
                 className="p-1 rounded"
                 title={deafened ? "Undeafen" : "Deafen"}
-                style={{ color: deafened ? DISCORD_COLORS.dnd : DISCORD_COLORS.textMuted }}
+                style={{ color: deafened ? "#f23f43" : "var(--ink-muted)" }}
               >
                 <Headphones className="w-4 h-4" />
               </button>
@@ -955,32 +1403,39 @@ export default function TeamChatPage() {
       {/* ── Center: Messages ── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Channel Header */}
-        <div
-          className="flex items-center justify-between px-4 h-12 shrink-0"
-          style={{
-            background: DISCORD_COLORS.content,
-            borderBottom: `1px solid ${DISCORD_COLORS.divider}`,
-            zIndex: 10,
-          }}
-        >
+        <div className="flex items-center justify-between px-4 h-12 shrink-0 bg-[var(--surface)] border-b border-[var(--rule)] z-10">
           <div className="flex items-center gap-2">
             {activeChannel?.type === "group" ? (
-              <Hash className="w-5 h-5" style={{ color: DISCORD_COLORS.textMuted }} strokeWidth={2} />
+              <Hash className="w-5 h-5 text-[var(--ink-muted)]" strokeWidth={2} />
             ) : activeChannel?.type === "direct" ? (
-              <AtSign className="w-5 h-5" style={{ color: DISCORD_COLORS.textMuted }} strokeWidth={2} />
+              <AtSign className="w-5 h-5 text-[var(--ink-muted)]" strokeWidth={2} />
+            ) : activeChannel?.type === "voice" ? (
+              <Volume2 className="w-5 h-5 text-[var(--ink-muted)]" strokeWidth={2} />
             ) : null}
-            <span className="font-semibold text-sm" style={{ color: DISCORD_COLORS.text }}>
-              {activeChannel
-                ? activeChannel.displayName || activeChannel.name || "Direct Message"
-                : "Select a channel"}
+            <span className="font-semibold text-sm text-[var(--ink)]">
+              {activeChannel ? (activeChannel.displayName || activeChannel.name || "Direct Message") : "Select a channel"}
             </span>
+            {aiMode && (
+              <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full text-white" style={{ background: "var(--accent-clay)" }}>
+                <Bot className="w-3 h-3" /> AI Mode
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
+            {canManage && activeChannelId && (
+              <button
+                onClick={() => setChannelSettingsId(activeChannelId)}
+                className="p-1.5 rounded text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors"
+                title="Channel settings"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
+            )}
             <button
               onClick={toggleMemberList}
-              className="p-1.5 rounded"
+              className="p-1.5 rounded transition-colors"
               title="Toggle member list"
-              style={{ color: showMemberList ? DISCORD_COLORS.text : DISCORD_COLORS.textMuted }}
+              style={{ color: showMemberList ? "var(--ink)" : "var(--ink-muted)" }}
             >
               <Users className="w-5 h-5" />
             </button>
@@ -994,21 +1449,21 @@ export default function TeamChatPage() {
               initial={{ height: 0 }}
               animate={{ height: 36 }}
               exit={{ height: 0 }}
-              className="flex items-center justify-between px-4 overflow-hidden shrink-0"
-              style={{ background: "#23a55a22", borderBottom: `1px solid ${DISCORD_COLORS.divider}` }}
+              className="flex items-center justify-between px-4 overflow-hidden shrink-0 border-b border-[var(--rule)]"
+              style={{ background: "#23a55a22" }}
             >
-              <div className="flex items-center gap-2 text-sm" style={{ color: DISCORD_COLORS.online }}>
+              <div className="flex items-center gap-2 text-sm" style={{ color: "#23a55a" }}>
                 <Volume2 className="w-4 h-4" />
-                <span>Connected to Voice – General Voice</span>
+                <span>Connected — {channels.find((c) => c.id === connectedVoice)?.name || "Voice"}</span>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => setMuted(!muted)} className="p-1 rounded" style={{ color: muted ? DISCORD_COLORS.dnd : DISCORD_COLORS.online }}>
+                <button onClick={() => setMuted(!muted)} className="p-1 rounded" style={{ color: muted ? "#f23f43" : "#23a55a" }}>
                   {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                 </button>
-                <button onClick={() => setDeafened(!deafened)} className="p-1 rounded" style={{ color: deafened ? DISCORD_COLORS.dnd : DISCORD_COLORS.online }}>
+                <button onClick={() => setDeafened(!deafened)} className="p-1 rounded" style={{ color: deafened ? "#f23f43" : "#23a55a" }}>
                   <Headphones className="w-4 h-4" />
                 </button>
-                <button onClick={() => setConnectedVoice(null)} className="p-1 rounded" style={{ color: DISCORD_COLORS.dnd }}>
+                <button onClick={() => setConnectedVoice(null)} className="p-1 rounded" style={{ color: "#f23f43" }}>
                   <PhoneOff className="w-4 h-4" />
                 </button>
               </div>
@@ -1018,12 +1473,11 @@ export default function TeamChatPage() {
 
         {/* Messages Area */}
         <div
-          ref={messagesContainerRef}
           className="flex-1 overflow-y-auto px-4 py-4"
-          style={{ scrollbarWidth: "thin", scrollbarColor: `${DISCORD_COLORS.inputBorder} transparent` }}
+          style={{ scrollbarWidth: "thin" }}
         >
           {!activeChannelId && (
-            <div className="h-full flex items-center justify-center" style={{ color: DISCORD_COLORS.textMuted }}>
+            <div className="h-full flex items-center justify-center text-[var(--ink-muted)]">
               <div className="text-center">
                 <Hash className="w-16 h-16 mx-auto mb-4 opacity-30" />
                 <p className="text-lg font-medium">Select a channel to start chatting</p>
@@ -1035,14 +1489,14 @@ export default function TeamChatPage() {
             <div className="pt-8 pb-4">
               <div
                 className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
-                style={{ background: DISCORD_COLORS.accent }}
+                style={{ background: "var(--accent-clay)" }}
               >
                 <Hash className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold mb-1" style={{ color: DISCORD_COLORS.text }}>
+              <h2 className="text-2xl font-bold mb-1 text-[var(--ink)]">
                 Welcome to #{activeChannel?.name || "channel"}!
               </h2>
-              <p className="text-sm" style={{ color: DISCORD_COLORS.textMuted }}>
+              <p className="text-sm text-[var(--ink-muted)]">
                 This is the start of the #{activeChannel?.name} channel.
               </p>
             </div>
@@ -1059,15 +1513,18 @@ export default function TeamChatPage() {
             const isOwn = msg.userId === user?.id;
             const msgReactions = reactions[msg.id] || msg.reactions || [];
 
+            // Poll detection
+            const pollMatch = msg.content?.match(/^\[POLL:([a-z0-9-]+)\]$/);
+
             return (
               <div key={msg.id}>
                 {showDateSep && (
                   <div className="flex items-center gap-3 my-4">
-                    <div className="flex-1 h-px" style={{ background: DISCORD_COLORS.divider }} />
-                    <span className="text-xs font-medium" style={{ color: DISCORD_COLORS.textMuted }}>
+                    <div className="flex-1 h-px bg-[var(--rule)]" />
+                    <span className="text-xs font-medium text-[var(--ink-muted)]">
                       {formatDateSeparator(msg.createdAt)}
                     </span>
-                    <div className="flex-1 h-px" style={{ background: DISCORD_COLORS.divider }} />
+                    <div className="flex-1 h-px bg-[var(--rule)]" />
                   </div>
                 )}
 
@@ -1080,7 +1537,7 @@ export default function TeamChatPage() {
                   onContextMenu={(e) => onContextMenu(e, msg)}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLDivElement).style.background =
-                      msg.pinnedAt ? "rgba(250,166,26,0.09)" : DISCORD_COLORS.hover;
+                      msg.pinnedAt ? "rgba(250,166,26,0.09)" : "var(--muted)";
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLDivElement).style.background =
@@ -1092,10 +1549,7 @@ export default function TeamChatPage() {
                     {!isGrouped ? (
                       <Avatar userId={msg.userId} name={msg.userName || "?"} size={40} />
                     ) : (
-                      <span
-                        className="text-[10px] opacity-0 group-hover:opacity-100 mt-1 select-none"
-                        style={{ color: DISCORD_COLORS.textMuted }}
-                      >
+                      <span className="text-[10px] opacity-0 group-hover:opacity-100 mt-1 select-none text-[var(--ink-muted)]">
                         {formatTime(msg.createdAt)}
                       </span>
                     )}
@@ -1105,7 +1559,7 @@ export default function TeamChatPage() {
                   <div className="flex-1 min-w-0">
                     {!isGrouped && (
                       <div className="flex items-baseline gap-2 mb-0.5">
-                        <span className="font-medium text-sm" style={{ color: DISCORD_COLORS.text }}>
+                        <span className="font-medium text-sm text-[var(--ink)]">
                           {isOwn ? "You" : msg.userName}
                         </span>
                         {msg.userRole && (
@@ -1119,22 +1573,14 @@ export default function TeamChatPage() {
                             {msg.userRole}
                           </span>
                         )}
-                        <span className="text-xs" style={{ color: DISCORD_COLORS.textMuted }}>
-                          {formatTime(msg.createdAt)}
-                        </span>
-                        {msg.pinnedAt && (
-                          <Pin className="w-3 h-3" style={{ color: DISCORD_COLORS.idle }} />
-                        )}
+                        <span className="text-xs text-[var(--ink-muted)]">{formatTime(msg.createdAt)}</span>
+                        {msg.pinnedAt && <Pin className="w-3 h-3" style={{ color: "#f0b132" }} />}
                       </div>
                     )}
 
                     {/* Reply preview */}
                     {msg.replyToId && (
-                      <ReplyPreview
-                        replyToId={msg.replyToId}
-                        messages={messages}
-                        teamUsers={teamUsers}
-                      />
+                      <ReplyPreview replyToId={msg.replyToId} messages={messages} />
                     )}
 
                     {/* Edit mode */}
@@ -1145,47 +1591,34 @@ export default function TeamChatPage() {
                           value={editInput}
                           onChange={(e) => setEditInput(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                              e.preventDefault();
-                              handleEditSave(msg.id);
-                            }
-                            if (e.key === "Escape") {
-                              setEditingMessageId(null);
-                              setEditInput("");
-                            }
+                            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEditSave(msg.id); }
+                            if (e.key === "Escape") { setEditingMessageId(null); setEditInput(""); }
                           }}
-                          className="w-full rounded px-3 py-2 text-sm resize-none outline-none"
-                          style={{
-                            background: DISCORD_COLORS.input,
-                            color: DISCORD_COLORS.text,
-                            border: `1px solid ${DISCORD_COLORS.accent}`,
-                          }}
+                          className="w-full rounded px-3 py-2 text-sm resize-none outline-none bg-[var(--bg)] border text-[var(--ink)]"
+                          style={{ borderColor: "var(--accent-clay)" }}
                           rows={2}
                           autoFocus
                         />
-                        <p className="text-xs mt-1" style={{ color: DISCORD_COLORS.textMuted }}>
-                          Enter to save · Esc to cancel
-                        </p>
+                        <p className="text-xs mt-1 text-[var(--ink-muted)]">Enter to save · Esc to cancel</p>
                       </div>
                     ) : (
                       <>
-                        {msg.content && (
-                          <p className="text-sm whitespace-pre-wrap break-words" style={{ color: DISCORD_COLORS.text }}>
-                            {msg.content}
-                            {msg.editedAt && (
-                              <span className="text-xs ml-1" style={{ color: DISCORD_COLORS.textMuted }}>
-                                (edited)
-                              </span>
+                        {pollMatch ? (
+                          <PollMessage pollId={pollMatch[1]} currentUserId={user?.id} />
+                        ) : (
+                          <>
+                            {msg.content && (
+                              <p className="text-sm whitespace-pre-wrap break-words text-[var(--ink)]">
+                                {msg.content}
+                                {msg.editedAt && (
+                                  <span className="text-xs ml-1 text-[var(--ink-muted)]">(edited)</span>
+                                )}
+                              </p>
                             )}
-                          </p>
+                          </>
                         )}
                         {msg.mediaUrl && msg.mediaType === "image" && (
-                          <img
-                            src={msg.mediaUrl}
-                            alt=""
-                            className="max-w-sm rounded-md mt-1"
-                            style={{ border: `1px solid ${DISCORD_COLORS.divider}` }}
-                          />
+                          <img src={msg.mediaUrl} alt="" className="max-w-sm rounded-md mt-1 border border-[var(--rule)]" />
                         )}
                         {msg.mediaUrl && msg.mediaType === "video" && (
                           <video src={msg.mediaUrl} controls className="max-w-sm rounded-md mt-1" />
@@ -1199,17 +1632,12 @@ export default function TeamChatPage() {
                         {msgReactions.map((r) => (
                           <button
                             key={r.emoji}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleReact(msg.id, r.emoji);
-                            }}
-                            className="flex items-center gap-1 px-2 py-0.5 rounded-full text-sm"
+                            onClick={(e) => { e.stopPropagation(); handleReact(msg.id, r.emoji); }}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded-full text-sm border"
                             style={{
-                              background: r.hasMe
-                                ? `${DISCORD_COLORS.accent}33`
-                                : DISCORD_COLORS.input,
-                              border: `1px solid ${r.hasMe ? DISCORD_COLORS.accent : DISCORD_COLORS.divider}`,
-                              color: DISCORD_COLORS.text,
+                              background: r.hasMe ? "rgba(var(--accent-clay-rgb, 200,100,60), 0.15)" : "var(--bg)",
+                              borderColor: r.hasMe ? "var(--accent-clay)" : "var(--rule)",
+                              color: "var(--ink)",
                             }}
                           >
                             <span>{r.emoji}</span>
@@ -1222,63 +1650,36 @@ export default function TeamChatPage() {
 
                   {/* Hover action bar */}
                   <div
-                    className="absolute right-2 top-0 -translate-y-1/2 hidden group-hover:flex items-center gap-1 rounded px-1 py-0.5 z-10"
-                    style={{
-                      background: DISCORD_COLORS.sidebar,
-                      border: `1px solid ${DISCORD_COLORS.divider}`,
-                      top: "-1px",
-                      transform: "translateY(-50%)",
-                    }}
+                    className="absolute right-2 top-0 hidden group-hover:flex items-center gap-1 rounded px-1 py-0.5 z-10 bg-[var(--bg)] border border-[var(--rule)]"
+                    style={{ top: "-1px", transform: "translateY(-50%)" }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {/* Quick react */}
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowEmojiPicker(true, msg.id);
-                      }}
-                      className="p-1 rounded text-xs"
-                      style={{ color: DISCORD_COLORS.textMuted }}
+                      onClick={(e) => { e.stopPropagation(); setShowEmojiPicker(true, msg.id); }}
+                      className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]"
                       title="Add reaction"
                     >
                       <Smile className="w-4 h-4" />
                     </button>
-                    {/* Reply */}
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setReplyingTo(msg);
-                        inputRef.current?.focus();
-                      }}
-                      className="p-1 rounded"
-                      style={{ color: DISCORD_COLORS.textMuted }}
+                      onClick={(e) => { e.stopPropagation(); setReplyingTo(msg); inputRef.current?.focus(); }}
+                      className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]"
                       title="Reply"
                     >
                       <Reply className="w-4 h-4" />
                     </button>
-                    {/* Edit (own only) */}
                     {isOwn && (
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditInput(msg.content);
-                          setEditingMessageId(msg.id);
-                        }}
-                        className="p-1 rounded"
-                        style={{ color: DISCORD_COLORS.textMuted }}
+                        onClick={(e) => { e.stopPropagation(); setEditInput(msg.content); setEditingMessageId(msg.id); }}
+                        className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]"
                         title="Edit"
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
                     )}
-                    {/* More */}
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedMessage(msg, { x: e.clientX, y: e.clientY });
-                      }}
-                      className="p-1 rounded"
-                      style={{ color: DISCORD_COLORS.textMuted }}
+                      onClick={(e) => { e.stopPropagation(); setSelectedMessage(msg, { x: e.clientX, y: e.clientY }); }}
+                      className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]"
                       title="More options"
                     >
                       <MoreHorizontal className="w-4 h-4" />
@@ -1292,21 +1693,15 @@ export default function TeamChatPage() {
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
-                        className="absolute right-2 z-20 rounded-lg p-2 flex gap-1"
-                        style={{
-                          background: DISCORD_COLORS.sidebar,
-                          border: `1px solid ${DISCORD_COLORS.divider}`,
-                          top: "100%",
-                          marginTop: 4,
-                        }}
+                        className="absolute right-2 z-20 rounded-lg p-2 flex gap-1 bg-[var(--bg)] border border-[var(--rule)]"
+                        style={{ top: "100%", marginTop: 4 }}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {COMMON_EMOJIS.map((emoji) => (
+                        {QUICK_EMOJIS.map((emoji) => (
                           <button
                             key={emoji}
                             onClick={() => handleReact(msg.id, emoji)}
                             className="text-lg hover:scale-125 transition-transform"
-                            title={emoji}
                           >
                             {emoji}
                           </button>
@@ -1323,10 +1718,7 @@ export default function TeamChatPage() {
 
         {/* Input Area */}
         {activeChannelId && (
-          <div
-            className="px-4 pb-4 pt-2 shrink-0"
-            style={{ background: DISCORD_COLORS.content }}
-          >
+          <div className="px-4 pb-4 pt-2 shrink-0 bg-[var(--surface)]">
             {/* Reply preview bar */}
             <AnimatePresence>
               {replyingTo && (
@@ -1334,22 +1726,57 @@ export default function TeamChatPage() {
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  className="flex items-center gap-2 px-3 py-1.5 mb-1 rounded-t-lg overflow-hidden"
-                  style={{ background: DISCORD_COLORS.input }}
+                  className="flex items-center gap-2 px-3 py-1.5 mb-1 rounded-t-lg overflow-hidden bg-[var(--bg)]"
                 >
-                  <Reply className="w-3.5 h-3.5 shrink-0" style={{ color: DISCORD_COLORS.textMuted }} />
-                  <span className="text-xs" style={{ color: DISCORD_COLORS.textMuted }}>
+                  <Reply className="w-3.5 h-3.5 shrink-0 text-[var(--ink-muted)]" />
+                  <span className="text-xs text-[var(--ink-muted)]">
                     Replying to{" "}
-                    <span style={{ color: DISCORD_COLORS.text, fontWeight: 500 }}>
-                      {replyingTo.userName || "Unknown"}
-                    </span>
+                    <span className="text-[var(--ink)] font-medium">{replyingTo.userName || "Unknown"}</span>
                     {" – "}
                     <span className="truncate">{replyingTo.content?.slice(0, 60)}</span>
                   </span>
+                  <button onClick={() => setReplyingTo(null)} className="ml-auto text-[var(--ink-muted)] hover:text-[var(--ink)]">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Poll creator */}
+            <AnimatePresence>
+              {showPollCreator && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <PollCreator
+                    onSubmit={handleCreatePoll}
+                    onCancel={() => setShowPollCreator(false)}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* AI mode banner */}
+            <AnimatePresence>
+              {aiMode && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="flex items-center gap-2 px-3 py-1.5 mb-1 rounded-t-lg overflow-hidden"
+                  style={{ background: "rgba(var(--accent-clay-rgb, 200,100,60), 0.12)", borderTop: "1px solid var(--accent-clay)" }}
+                >
+                  <Bot className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--accent-clay)" }} />
+                  <span className="text-xs" style={{ color: "var(--accent-clay)" }}>
+                    AI mode active — your next message will be answered by AI
+                  </span>
                   <button
-                    onClick={() => setReplyingTo(null)}
+                    onClick={() => setAiMode(false)}
                     className="ml-auto"
-                    style={{ color: DISCORD_COLORS.textMuted }}
+                    style={{ color: "var(--accent-clay)" }}
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -1358,78 +1785,51 @@ export default function TeamChatPage() {
             </AnimatePresence>
 
             {/* Format toolbar */}
-            <div
-              className="flex items-center gap-1 px-3 py-1 rounded-t-lg"
-              style={{ background: DISCORD_COLORS.input }}
-            >
-              <button
-                onClick={() => insertFormat("**")}
-                className="p-1 rounded text-xs font-bold"
-                style={{ color: DISCORD_COLORS.textMuted }}
-                title="Bold"
-              >
+            <div className="flex items-center gap-1 px-3 py-1 rounded-t-lg bg-[var(--bg)]">
+              <button onClick={() => insertFormat("**")} className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]" title="Bold">
                 <Bold className="w-3.5 h-3.5" />
               </button>
-              <button
-                onClick={() => insertFormat("*")}
-                className="p-1 rounded"
-                style={{ color: DISCORD_COLORS.textMuted }}
-                title="Italic"
-              >
+              <button onClick={() => insertFormat("*")} className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]" title="Italic">
                 <Italic className="w-3.5 h-3.5" />
               </button>
-              <button
-                onClick={() => insertFormat("`")}
-                className="p-1 rounded"
-                style={{ color: DISCORD_COLORS.textMuted }}
-                title="Code"
-              >
+              <button onClick={() => insertFormat("`")} className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]" title="Code">
                 <Code className="w-3.5 h-3.5" />
               </button>
-              <button
-                onClick={() => insertFormat("~~")}
-                className="p-1 rounded text-xs"
-                style={{ color: DISCORD_COLORS.textMuted }}
-                title="Strikethrough"
-              >
+              <button onClick={() => insertFormat("~~")} className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]" title="Strikethrough">
                 <span className="text-xs font-medium line-through">S</span>
               </button>
-              <div className="w-px h-4 mx-1" style={{ background: DISCORD_COLORS.divider }} />
-              <button
-                onClick={() => insertFormat("||")}
-                className="p-1 rounded text-xs"
-                style={{ color: DISCORD_COLORS.textMuted }}
-                title="Spoiler"
-              >
+              <div className="w-px h-4 mx-1 bg-[var(--rule)]" />
+              <button onClick={() => insertFormat("||")} className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]" title="Spoiler">
                 <span className="text-xs font-medium">||</span>
               </button>
             </div>
 
             {/* Main input row */}
-            <div
-              className="flex items-end gap-2 px-3 py-2 rounded-b-lg"
-              style={{ background: DISCORD_COLORS.input }}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,video/*"
-                className="hidden"
-                onChange={handleFileUpload}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="p-1 rounded"
-                style={{ color: DISCORD_COLORS.textMuted }}
-                title="Attach file"
-              >
-                {uploading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Paperclip className="w-5 h-5" />
-                )}
-              </button>
+            <div className="flex items-end gap-2 px-3 py-2 rounded-b-lg bg-[var(--bg)]">
+              <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFileUpload} />
+
+              {/* + button with popup menu */}
+              <div className="relative" ref={plusMenuRef}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowPlusMenu(!showPlusMenu); }}
+                  className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors"
+                  title="More options"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+                <AnimatePresence>
+                  {showPlusMenu && (
+                    <PlusMenu
+                      onUpload={() => fileInputRef.current?.click()}
+                      onPoll={() => setShowPollCreator(true)}
+                      onAiMode={() => setAiMode(!aiMode)}
+                      onEmoji={() => setShowEmojiGrid(true)}
+                      aiMode={aiMode}
+                      onClose={() => setShowPlusMenu(false)}
+                    />
+                  )}
+                </AnimatePresence>
+              </div>
 
               <div className="flex-1 relative">
                 {/* Mention autocomplete */}
@@ -1439,33 +1839,23 @@ export default function TeamChatPage() {
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 8 }}
-                      className="absolute bottom-full mb-1 left-0 right-0 rounded-lg overflow-hidden z-20"
-                      style={{
-                        background: DISCORD_COLORS.sidebar,
-                        border: `1px solid ${DISCORD_COLORS.divider}`,
-                      }}
+                      className="absolute bottom-full mb-1 left-0 right-0 rounded-lg overflow-hidden z-20 border border-[var(--rule)] bg-[var(--bg)]"
                     >
                       {mentionSuggestions.map((u, idx) => (
                         <button
                           key={u.id}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left"
-                          style={{
-                            background: idx === mentionIndex ? DISCORD_COLORS.active : "transparent",
-                            color: DISCORD_COLORS.text,
-                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left text-[var(--ink)] transition-colors"
+                          style={{ background: idx === mentionIndex ? "var(--muted)" : "transparent" }}
                           onClick={() => {
                             const atIdx = input.lastIndexOf("@");
-                            const newInput = input.slice(0, atIdx) + `@${u.name} `;
-                            setInput(newInput);
+                            setInput(input.slice(0, atIdx) + `@${u.name} `);
                             setMentionQuery(null);
                             inputRef.current?.focus();
                           }}
                         >
                           <Avatar userId={u.id} name={u.name} size={24} />
                           <span>{u.name}</span>
-                          <span className="text-xs ml-auto" style={{ color: DISCORD_COLORS.textMuted }}>
-                            {u.role}
-                          </span>
+                          <span className="text-xs ml-auto text-[var(--ink-muted)]">{u.role}</span>
                         </button>
                       ))}
                     </motion.div>
@@ -1480,12 +1870,8 @@ export default function TeamChatPage() {
                   placeholder={`Message ${activeChannel?.type === "group" ? "#" : ""}${activeChannel?.displayName || activeChannel?.name || "..."}`}
                   rows={1}
                   disabled={sending}
-                  className="w-full resize-none outline-none text-sm bg-transparent"
-                  style={{
-                    color: DISCORD_COLORS.text,
-                    maxHeight: 120,
-                    lineHeight: 1.5,
-                  }}
+                  className="w-full resize-none outline-none text-sm bg-transparent text-[var(--ink)] placeholder:text-[var(--ink-muted)]"
+                  style={{ maxHeight: 120, lineHeight: 1.5 }}
                   onInput={(e) => {
                     const ta = e.currentTarget;
                     ta.style.height = "auto";
@@ -1494,69 +1880,42 @@ export default function TeamChatPage() {
                 />
               </div>
 
-              <button
-                onClick={() => setShowEmojiPicker(!showEmojiPicker, undefined)}
-                className="p-1 rounded"
-                style={{ color: DISCORD_COLORS.textMuted }}
-                title="Emoji"
-              >
-                <Smile className="w-5 h-5" />
-              </button>
+              {/* Emoji button with grid picker */}
+              <div className="relative">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowEmojiGrid(!showEmojiGrid); }}
+                  className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors"
+                  title="Emoji"
+                >
+                  <Smile className="w-5 h-5" />
+                </button>
+                <AnimatePresence>
+                  {showEmojiGrid && (
+                    <EmojiGridPicker
+                      onSelect={(emoji) => {
+                        setInput((v) => v + emoji);
+                        setShowEmojiGrid(false);
+                        inputRef.current?.focus();
+                      }}
+                      onClose={() => setShowEmojiGrid(false)}
+                    />
+                  )}
+                </AnimatePresence>
+              </div>
 
               <button
                 onClick={handleSend}
                 disabled={sending || !input.trim()}
-                className="p-1.5 rounded"
+                className="p-1.5 rounded transition-all"
                 style={{
-                  background: input.trim() ? DISCORD_COLORS.accent : "transparent",
-                  color: input.trim() ? "#fff" : DISCORD_COLORS.textMuted,
-                  transition: "all 0.15s",
+                  background: input.trim() ? "var(--accent-clay)" : "transparent",
+                  color: input.trim() ? "#fff" : "var(--ink-muted)",
                 }}
                 title="Send"
               >
-                {sending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
+                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </button>
             </div>
-
-            {/* Global emoji picker (for input) */}
-            <AnimatePresence>
-              {showEmojiPicker && !emojiPickerMessageId && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 8 }}
-                  className="absolute bottom-20 right-8 rounded-lg p-3 z-30"
-                  style={{
-                    background: DISCORD_COLORS.sidebar,
-                    border: `1px solid ${DISCORD_COLORS.divider}`,
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <p className="text-xs mb-2" style={{ color: DISCORD_COLORS.textMuted }}>
-                    Quick Emojis
-                  </p>
-                  <div className="grid grid-cols-5 gap-1">
-                    {COMMON_EMOJIS.map((emoji) => (
-                      <button
-                        key={emoji}
-                        onClick={() => {
-                          setInput((v) => v + emoji);
-                          setShowEmojiPicker(false);
-                          inputRef.current?.focus();
-                        }}
-                        className="text-xl hover:scale-125 transition-transform p-1 rounded"
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         )}
       </div>
@@ -1569,60 +1928,36 @@ export default function TeamChatPage() {
             animate={{ width: 240, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="shrink-0 overflow-hidden"
-            style={{
-              background: DISCORD_COLORS.sidebar,
-              borderLeft: `1px solid ${DISCORD_COLORS.divider}`,
-            }}
+            className="shrink-0 overflow-hidden bg-[var(--bg)] border-l border-[var(--rule)]"
           >
             <div className="w-[240px] h-full overflow-y-auto py-4 px-2" style={{ scrollbarWidth: "thin" }}>
-              {/* Online members */}
               {onlineMembers.length > 0 && (
                 <div className="mb-4">
-                  <p
-                    className="text-xs font-semibold uppercase tracking-wider px-2 mb-1"
-                    style={{ color: DISCORD_COLORS.textMuted }}
-                  >
+                  <p className="text-xs font-semibold uppercase tracking-wider px-2 mb-1 text-[var(--ink-muted)]">
                     Online — {onlineMembers.length}
                   </p>
                   {onlineMembers.map((m) => {
                     const presence = onlineUsers.find((u) => u.userId === m.userId);
                     return (
-                      <MemberRow
-                        key={m.userId}
-                        member={m}
-                        status={presence?.status || "online"}
-                        isCurrentUser={m.userId === user?.id}
-                      />
+                      <MemberRow key={m.userId} member={m} status={presence?.status || "online"} isCurrentUser={m.userId === user?.id} />
                     );
                   })}
                 </div>
               )}
 
-              {/* Offline members */}
               {offlineMembers.length > 0 && (
                 <div>
-                  <p
-                    className="text-xs font-semibold uppercase tracking-wider px-2 mb-1"
-                    style={{ color: DISCORD_COLORS.textMuted }}
-                  >
+                  <p className="text-xs font-semibold uppercase tracking-wider px-2 mb-1 text-[var(--ink-muted)]">
                     Offline — {offlineMembers.length}
                   </p>
                   {offlineMembers.map((m) => (
-                    <MemberRow
-                      key={m.userId}
-                      member={m}
-                      status="offline"
-                      isCurrentUser={m.userId === user?.id}
-                    />
+                    <MemberRow key={m.userId} member={m} status="offline" isCurrentUser={m.userId === user?.id} />
                   ))}
                 </div>
               )}
 
               {currentMembers.length === 0 && (
-                <p className="text-xs px-2" style={{ color: DISCORD_COLORS.textMuted }}>
-                  No members
-                </p>
+                <p className="text-xs px-2 text-[var(--ink-muted)]">No members</p>
               )}
             </div>
           </motion.div>
@@ -1637,12 +1972,10 @@ export default function TeamChatPage() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed z-50 rounded-lg py-1 min-w-[180px]"
+            className="fixed z-50 rounded-xl py-1 min-w-[180px] border bg-[var(--bg)] border-[var(--rule)]"
             style={{
               left: Math.min(contextMenuPos.x, window.innerWidth - 200),
               top: Math.min(contextMenuPos.y, window.innerHeight - 300),
-              background: DISCORD_COLORS.sidebarDark,
-              border: `1px solid ${DISCORD_COLORS.divider}`,
               boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
             }}
             onClick={(e) => e.stopPropagation()}
@@ -1650,29 +1983,18 @@ export default function TeamChatPage() {
             <ContextMenuItem
               icon={<Smile className="w-4 h-4" />}
               label="Add Reaction"
-              onClick={() => {
-                setShowEmojiPicker(true, selectedMessage.id);
-                setSelectedMessage(null);
-              }}
+              onClick={() => { setShowEmojiPicker(true, selectedMessage.id); setSelectedMessage(null); }}
             />
             <ContextMenuItem
               icon={<Reply className="w-4 h-4" />}
               label="Reply"
-              onClick={() => {
-                setReplyingTo(selectedMessage);
-                setSelectedMessage(null);
-                inputRef.current?.focus();
-              }}
+              onClick={() => { setReplyingTo(selectedMessage); setSelectedMessage(null); inputRef.current?.focus(); }}
             />
             {selectedMessage.userId === user?.id && (
               <ContextMenuItem
                 icon={<Pencil className="w-4 h-4" />}
                 label="Edit Message"
-                onClick={() => {
-                  setEditInput(selectedMessage.content);
-                  setEditingMessageId(selectedMessage.id);
-                  setSelectedMessage(null);
-                }}
+                onClick={() => { setEditInput(selectedMessage.content); setEditingMessageId(selectedMessage.id); setSelectedMessage(null); }}
               />
             )}
             {canManage && (
@@ -1682,18 +2004,15 @@ export default function TeamChatPage() {
                 onClick={() => handlePin(selectedMessage.id)}
               />
             )}
-            <div className="h-px my-1" style={{ background: DISCORD_COLORS.divider }} />
+            <div className="h-px my-1 bg-[var(--rule)]" />
             <ContextMenuItem
               icon={<Check className="w-4 h-4" />}
               label="Copy Text"
-              onClick={() => {
-                navigator.clipboard.writeText(selectedMessage.content).catch(() => {});
-                setSelectedMessage(null);
-              }}
+              onClick={() => { navigator.clipboard.writeText(selectedMessage.content).catch(() => {}); setSelectedMessage(null); }}
             />
             {(selectedMessage.userId === user?.id || isFounder) && (
               <>
-                <div className="h-px my-1" style={{ background: DISCORD_COLORS.divider }} />
+                <div className="h-px my-1 bg-[var(--rule)]" />
                 <ContextMenuItem
                   icon={<Trash2 className="w-4 h-4" />}
                   label="Delete Message"
@@ -1703,6 +2022,45 @@ export default function TeamChatPage() {
               </>
             )}
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Channel Context Menu ── */}
+      <AnimatePresence>
+        {channelContextMenu && (
+          <ChannelContextMenu
+            channel={channelContextMenu.channel}
+            pos={channelContextMenu.pos}
+            canManage={canManage}
+            isMuted={mutedChannels.has(channelContextMenu.channel.id)}
+            onOpenChat={() => setActiveChannel(channelContextMenu.channel.id)}
+            onSettings={() => setChannelSettingsId(channelContextMenu.channel.id)}
+            onMuteToggle={() =>
+              setMutedChannels((prev) => {
+                const next = new Set(prev);
+                if (next.has(channelContextMenu.channel.id)) next.delete(channelContextMenu.channel.id);
+                else next.add(channelContextMenu.channel.id);
+                return next;
+              })
+            }
+            onDelete={() => handleDeleteChannel(channelContextMenu.channel.id)}
+            onClose={() => setChannelContextMenu(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Channel Settings Modal ── */}
+      <AnimatePresence>
+        {settingsChannel && (
+          <ChannelSettingsModal
+            channel={settingsChannel}
+            members={settingsMembers}
+            teamUsers={teamUsers}
+            onClose={() => setChannelSettingsId(null)}
+            onSaved={(updated) => {
+              setChannels(channels.map((c) => c.id === settingsChannel.id ? { ...c, ...updated } : c));
+            }}
+          />
         )}
       </AnimatePresence>
     </div>
@@ -1716,66 +2074,52 @@ function ChannelItem({
   active,
   icon,
   onSelect,
-  onlineUsers,
-  teamUsers,
-  currentUserId,
+  onRightClick,
+  onSettings,
   canManage,
-  isFounder,
-  onDeleteChannel,
+  isMuted,
+  isVoice,
 }: {
   channel: EnrichedChannel;
   active: boolean;
   icon: React.ReactNode;
   onSelect: () => void;
-  onlineUsers: Array<{ userId: string; status: string }>;
-  teamUsers: Array<{ id: string; name: string }>;
-  currentUserId?: string;
+  onRightClick?: (e: React.MouseEvent) => void;
+  onSettings?: () => void;
   canManage?: boolean;
-  isFounder?: boolean;
-  onDeleteChannel?: (id: string) => void;
+  isMuted?: boolean;
+  isVoice?: boolean;
 }) {
   const [hover, setHover] = useState(false);
 
-  const displayName =
-    channel.displayName ||
-    channel.name ||
-    (() => {
-      // For DMs, can't resolve here without more info — use what we have
-      return "Direct Message";
-    })();
+  const displayName = channel.displayName || channel.name || "Direct Message";
 
   return (
     <button
       onClick={onSelect}
+      onContextMenu={onRightClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md mx-1 group text-sm"
+      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md mx-1 group text-sm transition-colors"
       style={{
         width: "calc(100% - 8px)",
-        background: active ? DISCORD_COLORS.active : hover ? DISCORD_COLORS.hover : "transparent",
-        color: active ? DISCORD_COLORS.text : DISCORD_COLORS.textMuted,
-        transition: "background 0.1s",
+        background: active ? "rgba(255,255,255,0.1)" : hover ? "var(--muted)" : "transparent",
+        color: active ? "var(--ink)" : "var(--ink-muted)",
       }}
     >
-      <span style={{ color: active ? DISCORD_COLORS.text : DISCORD_COLORS.textMuted }}>{icon}</span>
+      <span style={{ color: active ? "var(--ink)" : "var(--ink-muted)" }}>{icon}</span>
       <span className="flex-1 truncate text-left">{displayName}</span>
+      {isMuted && <BellOff className="w-3 h-3 text-[var(--ink-muted)] opacity-60" />}
       {(channel.unread ?? 0) > 0 && (
-        <span
-          className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white"
-          style={{ background: DISCORD_COLORS.dnd }}
-        >
+        <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white" style={{ background: "#f23f43" }}>
           {(channel.unread ?? 0) > 9 ? "9+" : channel.unread}
         </span>
       )}
-      {hover && canManage && channel.name !== "General" && onDeleteChannel && (
+      {hover && canManage && !isVoice && onSettings && (
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDeleteChannel(channel.id);
-          }}
-          className="p-0.5 rounded opacity-60 hover:opacity-100"
-          style={{ color: DISCORD_COLORS.textMuted }}
-          title="Delete channel"
+          onClick={(e) => { e.stopPropagation(); onSettings(); }}
+          className="p-0.5 rounded opacity-60 hover:opacity-100 text-[var(--ink-muted)]"
+          title="Channel settings"
         >
           <Settings className="w-3.5 h-3.5" />
         </button>
@@ -1793,73 +2137,45 @@ function MemberRow({
   status: string;
   isCurrentUser: boolean;
 }) {
+  const statusColors: Record<string, string> = {
+    online: "#23a55a",
+    idle: "#f0b132",
+    dnd: "#f23f43",
+    offline: "#80848e",
+  };
+
   return (
-    <div
-      className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-default"
-      style={{ opacity: status === "offline" ? 0.5 : 1 }}
-    >
+    <div className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-default" style={{ opacity: status === "offline" ? 0.5 : 1 }}>
       <div className="relative">
         <Avatar userId={member.userId} name={member.name} size={32} />
         <span
           className="absolute -bottom-0.5 -right-0.5"
           style={{
-            width: 12,
-            height: 12,
-            borderRadius: "50%",
-            background: {
-              online: DISCORD_COLORS.online,
-              idle: DISCORD_COLORS.idle,
-              dnd: DISCORD_COLORS.dnd,
-              offline: DISCORD_COLORS.offline,
-            }[status] || DISCORD_COLORS.offline,
-            border: `2px solid ${DISCORD_COLORS.sidebar}`,
+            width: 12, height: 12, borderRadius: "50%",
+            background: statusColors[status] || "#80848e",
+            border: "2px solid var(--bg)",
           }}
         />
       </div>
       <div className="flex-1 min-w-0">
-        <p
-          className="text-sm font-medium truncate"
-          style={{ color: DISCORD_COLORS.text }}
-        >
+        <p className="text-sm font-medium truncate text-[var(--ink)]">
           {member.name}
-          {isCurrentUser && (
-            <span className="text-xs ml-1" style={{ color: DISCORD_COLORS.textMuted }}>
-              (you)
-            </span>
-          )}
+          {isCurrentUser && <span className="text-xs ml-1 text-[var(--ink-muted)]">(you)</span>}
         </p>
-        <p className="text-xs truncate" style={{ color: DISCORD_COLORS.textMuted }}>
-          {member.role}
-        </p>
+        <p className="text-xs truncate text-[var(--ink-muted)]">{member.role}</p>
       </div>
     </div>
   );
 }
 
-function ReplyPreview({
-  replyToId,
-  messages,
-  teamUsers,
-}: {
-  replyToId: string;
-  messages: EnrichedMessage[];
-  teamUsers: Array<{ id: string; name: string }>;
-}) {
+function ReplyPreview({ replyToId, messages }: { replyToId: string; messages: EnrichedMessage[] }) {
   const original = messages.find((m) => m.id === replyToId);
   if (!original) return null;
 
   return (
-    <div
-      className="flex items-center gap-1 mb-1 pl-2 text-xs rounded"
-      style={{
-        borderLeft: `2px solid ${DISCORD_COLORS.textMuted}`,
-        color: DISCORD_COLORS.textMuted,
-      }}
-    >
+    <div className="flex items-center gap-1 mb-1 pl-2 text-xs rounded border-l-2 border-[var(--ink-muted)] text-[var(--ink-muted)]">
       <Reply className="w-3 h-3 shrink-0" />
-      <span className="font-medium" style={{ color: DISCORD_COLORS.text }}>
-        {original.userName || "Unknown"}
-      </span>
+      <span className="font-medium text-[var(--ink)]">{original.userName || "Unknown"}</span>
       <span className="truncate max-w-[200px]">{original.content?.slice(0, 80)}</span>
     </div>
   );
@@ -1882,15 +2198,10 @@ function ContextMenuItem({
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className="w-full flex items-center gap-2 px-3 py-1.5 text-sm"
+      className="w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors"
       style={{
-        color: danger ? DISCORD_COLORS.dnd : DISCORD_COLORS.text,
-        background: hover
-          ? danger
-            ? `${DISCORD_COLORS.dnd}22`
-            : DISCORD_COLORS.hover
-          : "transparent",
-        transition: "background 0.1s",
+        color: danger ? "#f23f43" : "var(--ink)",
+        background: hover ? (danger ? "rgba(242,63,67,0.1)" : "var(--muted)") : "transparent",
       }}
     >
       {icon}

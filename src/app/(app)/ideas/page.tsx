@@ -5,6 +5,7 @@ import { ideas, clients } from "@/db/schema";
 import { desc } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { InlineCreateForm } from "@/components/inline-create-form";
 
 const COLUMN_LABELS: Record<string, string> = {
   raw: "Raw",
@@ -31,11 +32,35 @@ export default async function IdeasPage() {
 
   const clientMap = new Map(allClients.map((c) => [c.id, c]));
 
+  const clientOptions = allClients
+    .filter((c) => !c.archivedAt)
+    .map((c) => ({ value: c.id, label: c.name }));
+
   return (
     <div className="max-w-5xl mx-auto px-6 py-10">
-      <div className="flex items-center gap-3 mb-1">
-        <Lightbulb className="w-6 h-6 text-[var(--ink-muted)]" strokeWidth={1.5} />
-        <h1 className="text-3xl font-serif font-semibold">Ideas</h1>
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-3">
+          <Lightbulb className="w-6 h-6 text-[var(--ink-muted)]" strokeWidth={1.5} />
+          <h1 className="text-3xl font-serif font-semibold">Ideas</h1>
+        </div>
+        <InlineCreateForm
+          buttonLabel="New idea"
+          apiEndpoint="/api/ideas"
+          fields={[
+            { name: "clientId", label: "Client", type: "select", required: true, options: clientOptions },
+            { name: "title", label: "Title", type: "text", required: true, placeholder: "Idea title" },
+            {
+              name: "column",
+              label: "Stage",
+              type: "select",
+              options: [
+                { value: "raw", label: "Raw" },
+                { value: "cooking", label: "Cooking" },
+                { value: "ready", label: "Ready" },
+              ],
+            },
+          ]}
+        />
       </div>
       <p className="text-[var(--ink-muted)] mb-8">
         All creative ideas across your clients.

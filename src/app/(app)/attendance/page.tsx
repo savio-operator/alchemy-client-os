@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarCheck, Check, Users } from "lucide-react";
+import { CheckCircle, Clock, Users, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useUser } from "@/store/user";
 
 interface AttendanceRecord {
@@ -11,22 +10,30 @@ interface AttendanceRecord {
   userId: string;
   date: string;
   markedAt: string;
+  status: string;
+  notes: string | null;
 }
 
 interface TeamUser {
   id: string;
   name: string;
   role: string;
+  avatarUrl?: string | null;
 }
 
-export default function AttendancePage() {
+export default function CompletionPage() {
   const { user } = useUser();
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [markedToday, setMarkedToday] = useState(false);
-  const [marking, setMarking] = useState(false);
+  const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
   const [view, setView] = useState<"self" | "team">("self");
   const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
   const [teamRecords, setTeamRecords] = useState<AttendanceRecord[]>([]);
+
+  // Form state
+  const [selectedStatus, setSelectedStatus] = useState<"completed" | "in_progress" | null>(null);
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const isLeader = user?.role === "founder" || user?.role === "manager";
 
@@ -36,6 +43,7 @@ export default function AttendancePage() {
       .then((data) => {
         setRecords(data.records || []);
         setMarkedToday(data.markedToday || false);
+        setTodayRecord(data.todayRecord || null);
       });
   }, []);
 
@@ -50,35 +58,44 @@ export default function AttendancePage() {
     }
   }, [view, isLeader]);
 
-  const handleMark = async () => {
-    setMarking(true);
-    const res = await fetch("/api/attendance", { method: "POST" });
+  const handleSubmit = async () => {
+    if (!selectedStatus) return;
+    setSubmitting(true);
+    const res = await fetch("/api/attendance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: selectedStatus, notes }),
+    });
     if (res.ok) {
-      setMarkedToday(true);
       const data = await res.json();
-      setRecords((prev) => [
-        { id: data.date, userId: user?.id || "", date: data.date, markedAt: new Date().toISOString() },
-        ...prev,
-      ]);
+      const newRecord: AttendanceRecord = {
+        id: crypto.randomUUID(),
+        userId: user?.id || "",
+        date: data.date,
+        markedAt: new Date().toISOString(),
+        status: data.status,
+        notes: data.notes,
+      };
+      setMarkedToday(true);
+      setTodayRecord(newRecord);
+      setRecords((prev) => [newRecord, ...prev]);
     }
-    setMarking(false);
+    setSubmitting(false);
   };
 
   const today = new Date().toISOString().split("T")[0];
-
-  // Build calendar grid for current month
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfWeek = new Date(year, month, 1).getDay();
 
-  const markedDates = new Set(records.map((r) => r.date));
+  const recordByDate = new Map(records.map((r) => [r.date, r]));
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-10">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold font-serif">Attendance</h1>
+        <h1 className="text-2xl font-semibold font-serif">Completion</h1>
         {isLeader && (
           <div className="flex gap-1">
             <Button
@@ -86,7 +103,7 @@ export default function AttendancePage() {
               size="sm"
               onClick={() => setView("self")}
             >
-              My attendance
+              My status
             </Button>
             <Button
               variant={view === "team" ? "default" : "outline"}
@@ -103,39 +120,115 @@ export default function AttendancePage() {
 
       {view === "self" ? (
         <>
-          {/* Mark present */}
-          <div className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-6 mb-6 text-center">
-            {markedToday ? (
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center">
-                  <Check className="w-6 h-6 text-green-600" strokeWidth={2} />
-                </div>
-                <p className="text-sm font-medium">Present today</p>
-                <p className="text-xs text-[var(--ink-muted)]">
-                  Marked at{" "}
-                  {records[0]?.markedAt
-                    ? new Date(records[0].markedAt).toLocaleTimeString("en-IN", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "now"}
+          {/* Status card */}
+          <div className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-6 mb-6">
+            {markedToday && todayRecord ? (
+              <div className="flex flex-col items-center gap-3 text-center">
+                {todayRecord.status === "completed" ? (
+                  <>
+                    <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center">
+                      <CheckCircle className="w-6 h-6 text-green-600" strokeWidth={2} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-green-700 dark:text-green-400">Tasks Completed</p>
+                      <p className="text-xs text-[var(--ink-muted)] mt-0.5">
+                        Reported at{" "}
+                        {new Date(todayRecord.markedAt).toLocaleTimeString("en-IN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                    {todayRecord.notes && (
+                      <p className="text-sm text-[var(--ink-muted)] italic max-w-sm">
+                        &ldquo;{todayRecord.notes}&rdquo;
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-950 flex items-center justify-center">
+                      <Clock className="w-6 h-6 text-amber-600" strokeWidth={2} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Still Working</p>
+                      <p className="text-xs text-[var(--ink-muted)] mt-0.5">
+                        Reported at{" "}
+                        {new Date(todayRecord.markedAt).toLocaleTimeString("en-IN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                    {todayRecord.notes && (
+                      <p className="text-sm text-[var(--ink-muted)] italic max-w-sm">
+                        &ldquo;{todayRecord.notes}&rdquo;
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            ) : selectedStatus === null ? (
+              <div>
+                <p className="text-sm text-[var(--ink-muted)] mb-4 text-center">
+                  How are your tasks going today?
                 </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setSelectedStatus("completed")}
+                    className="flex-1 flex flex-col items-center gap-2 p-4 rounded-[var(--radius)] border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-950/70 transition-colors"
+                  >
+                    <CheckCircle className="w-7 h-7 text-green-600" strokeWidth={1.5} />
+                    <span className="text-sm font-medium text-green-700 dark:text-green-400">Tasks Completed</span>
+                  </button>
+                  <button
+                    onClick={() => setSelectedStatus("in_progress")}
+                    className="flex-1 flex flex-col items-center gap-2 p-4 rounded-[var(--radius)] border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-950/70 transition-colors"
+                  >
+                    <Clock className="w-7 h-7 text-amber-600" strokeWidth={1.5} />
+                    <span className="text-sm font-medium text-amber-700 dark:text-amber-400">Still Working</span>
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-3">
-                <CalendarCheck
-                  className="w-8 h-8 text-[var(--ink-muted)]"
-                  strokeWidth={1.5}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <button
+                    onClick={() => setSelectedStatus(null)}
+                    className="text-xs text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors"
+                  >
+                    ← Back
+                  </button>
+                  <span className="text-sm font-medium">
+                    {selectedStatus === "completed" ? (
+                      <span className="text-green-700 dark:text-green-400">Tasks Completed</span>
+                    ) : (
+                      <span className="text-amber-700 dark:text-amber-400">Still Working</span>
+                    )}
+                  </span>
+                </div>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder={
+                    selectedStatus === "completed"
+                      ? "Any suggestions or feedback for tomorrow? (optional)"
+                      : "How long do you think it will take? (optional)"
+                  }
+                  rows={3}
+                  className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] p-3 bg-transparent resize-none outline-none focus:border-[var(--accent-clay)] transition-colors"
                 />
-                <p className="text-sm text-[var(--ink-muted)]">
-                  Mark your attendance for today
-                </p>
                 <Button
-                  onClick={handleMark}
-                  disabled={marking}
-                  className="bg-[var(--accent-clay)] hover:bg-[var(--accent-clay)]/90 text-white"
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="mt-3 bg-[var(--accent-clay)] hover:bg-[var(--accent-clay)]/90 text-white"
                 >
-                  {marking ? "Marking..." : "Mark present"}
+                  {submitting ? "Submitting..." : (
+                    <span className="flex items-center gap-2">
+                      <Check className="w-4 h-4" strokeWidth={2} />
+                      Submit
+                    </span>
+                  )}
                 </Button>
               </div>
             )}
@@ -158,24 +251,47 @@ export default function AttendancePage() {
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i + 1;
                 const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                const isMarked = markedDates.has(dateStr);
+                const record = recordByDate.get(dateStr);
                 const isToday = dateStr === today;
+
+                let cellClass = "text-[var(--ink-muted)]";
+                let dotEl: React.ReactNode = null;
+
+                if (record) {
+                  if (record.status === "completed") {
+                    cellClass = "text-green-700 dark:text-green-300 font-medium";
+                    dotEl = <span className="block w-1.5 h-1.5 rounded-full bg-green-500 mx-auto mt-0.5" />;
+                  } else {
+                    cellClass = "text-amber-700 dark:text-amber-300 font-medium";
+                    dotEl = <span className="block w-1.5 h-1.5 rounded-full bg-amber-500 mx-auto mt-0.5" />;
+                  }
+                } else {
+                  dotEl = <span className="block w-1.5 h-1.5 rounded-full bg-[var(--rule)] mx-auto mt-0.5" />;
+                }
 
                 return (
                   <div
                     key={day}
-                    className={`h-8 flex items-center justify-center rounded-[var(--radius-sm)] text-xs ${
-                      isMarked
-                        ? "bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300 font-medium"
-                        : isToday
-                        ? "border border-[var(--accent-clay)] font-medium"
-                        : "text-[var(--ink-muted)]"
+                    className={`h-9 flex flex-col items-center justify-center rounded-[var(--radius-sm)] text-xs ${cellClass} ${
+                      isToday ? "border border-[var(--accent-clay)]" : ""
                     }`}
                   >
-                    {day}
+                    <span>{day}</span>
+                    {dotEl}
                   </div>
                 );
               })}
+            </div>
+            <div className="flex items-center gap-4 mt-4 text-[10px] text-[var(--ink-muted)]">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Completed
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> In progress
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[var(--rule)] inline-block" /> Not reported
+              </span>
             </div>
           </div>
         </>
@@ -184,17 +300,18 @@ export default function AttendancePage() {
         <div className="space-y-3">
           {teamUsers.map((u) => {
             const userRecords = teamRecords.filter((r) => r.userId === u.id);
-            const markedTodayTeam = userRecords.some((r) => r.date === today);
+            const todayRec = userRecords.find((r) => r.date === today);
+            const completedThisMonth = userRecords.filter((r) => r.status === "completed").length;
 
             return (
               <div
                 key={u.id}
                 className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-4"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-[var(--accent-clay)]/10 flex items-center justify-center">
-                      <span className="text-xs font-medium text-[var(--accent-clay)]">
+                    <div className="w-9 h-9 rounded-full bg-[var(--accent-clay)]/10 flex items-center justify-center shrink-0">
+                      <span className="text-xs font-semibold text-[var(--accent-clay)]">
                         {u.name
                           .split(" ")
                           .map((n) => n[0])
@@ -205,25 +322,43 @@ export default function AttendancePage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium">{u.name}</p>
-                      <p className="text-xs text-[var(--ink-muted)]">
-                        {userRecords.length} days this month
-                      </p>
+                      <p className="text-xs text-[var(--ink-muted)] capitalize">{u.role}</p>
                     </div>
                   </div>
-                  <Badge
-                    variant="secondary"
-                    className={`text-[10px] ${
-                      markedTodayTeam
-                        ? "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300"
-                        : "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300"
-                    }`}
-                  >
-                    {markedTodayTeam ? "Present" : "Absent"}
-                  </Badge>
+                  <div className="text-right shrink-0">
+                    {todayRec ? (
+                      todayRec.status === "completed" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300">
+                          <CheckCircle className="w-3 h-3" strokeWidth={2} />
+                          Completed
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                          <Clock className="w-3 h-3" strokeWidth={2} />
+                          In Progress
+                        </span>
+                      )
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--muted)] text-[var(--ink-muted)]">
+                        Not reported
+                      </span>
+                    )}
+                    <p className="text-[10px] text-[var(--ink-muted)] mt-1">
+                      {completedThisMonth} completed this month
+                    </p>
+                  </div>
                 </div>
+                {todayRec?.notes && (
+                  <p className="mt-3 text-xs text-[var(--ink-muted)] italic border-t border-[var(--rule)] pt-2">
+                    &ldquo;{todayRec.notes}&rdquo;
+                  </p>
+                )}
               </div>
             );
           })}
+          {teamUsers.length === 0 && (
+            <p className="text-sm text-[var(--ink-muted)] text-center py-8">No active team members found.</p>
+          )}
         </div>
       )}
     </div>
