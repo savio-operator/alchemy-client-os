@@ -331,11 +331,31 @@ async function initTables() {
     );
   `);
 
+  // New tables for Discord-like chat
+  await client.executeMultiple(`
+    CREATE TABLE IF NOT EXISTS chat_reactions (
+      id TEXT PRIMARY KEY,
+      message_id TEXT NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      emoji TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS user_presence (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'offline',
+      last_seen_at TEXT NOT NULL
+    );
+  `);
+
   // Idempotent ALTER TABLE statements for new columns
   const alters = [
     "ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE CASCADE",
     "ALTER TABLE conversations ADD COLUMN user_id TEXT",
     "ALTER TABLE memories ADD COLUMN user_id TEXT",
+    "ALTER TABLE chat_messages ADD COLUMN edited_at TEXT",
+    "ALTER TABLE chat_messages ADD COLUMN pinned_at TEXT",
+    "ALTER TABLE chat_messages ADD COLUMN pinned_by TEXT",
   ];
   for (const sql of alters) {
     try {

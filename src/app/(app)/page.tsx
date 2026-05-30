@@ -94,13 +94,13 @@ export default async function HomePage() {
       label: "Active campaigns",
       value: activeCampaignCount[0]?.value ?? 0,
       icon: Megaphone,
-      href: activeClients[0] ? `/clients/${activeClients[0].slug}` : null,
+      href: "/campaigns",
     },
     {
       label: "Ideas",
       value: ideasCount[0]?.value ?? 0,
       icon: Lightbulb,
-      href: activeClients[0] ? `/clients/${activeClients[0].slug}` : null,
+      href: "/ideas",
     },
     ...(isFounder
       ? [
@@ -108,19 +108,19 @@ export default async function HomePage() {
             label: "Open tasks",
             value: taskCount?.[0]?.value ?? 0,
             icon: CheckSquare,
-            href: activeClients[0] ? `/clients/${activeClients[0].slug}` : null,
+            href: "/tasks",
           },
           {
             label: "Pending invoices",
             value: pendingInvoices?.[0]?.value ?? 0,
             icon: Receipt,
-            href: activeClients[0] ? `/clients/${activeClients[0].slug}` : null,
+            href: "/invoices",
           },
           {
             label: "New leads",
             value: leadCount?.[0]?.value ?? 0,
             icon: Compass,
-            href: activeClients[0] ? `/clients/${activeClients[0].slug}` : null,
+            href: "/leads",
           },
         ]
       : [

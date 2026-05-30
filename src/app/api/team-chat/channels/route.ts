@@ -92,7 +92,30 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
-  const { targetUserId } = body as { targetUserId: string };
+  const { targetUserId, name, type: channelType } = body as {
+    targetUserId?: string;
+    name?: string;
+    type?: string;
+  };
+
+  // Creating a named group channel
+  if (channelType === "group" && name) {
+    if (user.role !== "founder" && user.role !== "manager") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const channelId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    await db.insert(chatChannels).values({ id: channelId, type: "group", name: name.trim(), createdAt: now }).run();
+
+    // Add all active users
+    const activeUsers = await db.select().from(users).where(eq(users.status, "active")).all();
+    for (const u of activeUsers) {
+      await db.insert(chatChannelMembers).values({ channelId, userId: u.id, joinedAt: now }).run();
+    }
+
+    return NextResponse.json({ id: channelId, type: "group", name: name.trim(), createdAt: now });
+  }
 
   if (!targetUserId) {
     return NextResponse.json({ error: "targetUserId required" }, { status: 400 });

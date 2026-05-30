@@ -280,7 +280,30 @@ export const chatMessages = sqliteTable("chat_messages", {
   mediaType: text("media_type"), // image, video
   mediaExpiresAt: text("media_expires_at"),
   replyToId: text("reply_to_id"),
+  editedAt: text("edited_at"),
+  pinnedAt: text("pinned_at"),
+  pinnedBy: text("pinned_by"),
   createdAt: text("created_at").notNull(),
+});
+
+export const chatReactions = sqliteTable("chat_reactions", {
+  id: text("id").primaryKey(),
+  messageId: text("message_id")
+    .notNull()
+    .references(() => chatMessages.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  emoji: text("emoji").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const userPresence = sqliteTable("user_presence", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("offline"), // online, idle, dnd, offline
+  lastSeenAt: text("last_seen_at").notNull(),
 });
 
 // --- Update Tracking ---
@@ -389,6 +412,8 @@ export type Notification = typeof notifications.$inferSelect;
 export type Attendance = typeof attendance.$inferSelect;
 export type ChatChannel = typeof chatChannels.$inferSelect;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+export type ChatReaction = typeof chatReactions.$inferSelect;
+export type UserPresence = typeof userPresence.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type Lead = typeof leads.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
