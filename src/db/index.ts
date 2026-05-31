@@ -503,6 +503,7 @@ async function initTables() {
     "ALTER TABLE invoices ADD COLUMN from_name TEXT",
     "ALTER TABLE invoices ADD COLUMN from_address TEXT",
     "ALTER TABLE invoices ADD COLUMN from_gst TEXT",
+    "ALTER TABLE invoices ADD COLUMN payment_details TEXT",
   ];
   for (const sql of alters) {
     try {

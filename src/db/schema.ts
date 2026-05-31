@@ -375,6 +375,7 @@ export const invoices = sqliteTable("invoices", {
   fromName: text("from_name"),
   fromAddress: text("from_address"),
   fromGst: text("from_gst"),
+  paymentDetails: text("payment_details"), // JSON: { bankName, bankAccount, bankIfsc, bankBranch, upiId }
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

@@ -26,6 +26,14 @@ interface LineItem {
   amount: number;
 }
 
+interface PaymentDetails {
+  bankName: string;
+  bankAccount: string;
+  bankIfsc: string;
+  bankBranch: string;
+  upiId: string;
+}
+
 interface InvoiceData {
   id: string;
   clientId: string;
@@ -42,6 +50,7 @@ interface InvoiceData {
   fromName: string | null;
   fromAddress: string | null;
   fromGst: string | null;
+  paymentDetails: string | null;
   createdAt: string;
   items: LineItem[];
   client: { id: string; name: string; slug: string } | null;
@@ -105,12 +114,17 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
   const [items, setItems] = useState<LineItem[]>([
     { description: "", quantity: 1, rate: 0, amount: 0 },
   ]);
+  const [bankName, setBankName] = useState("");
+  const [bankAccount, setBankAccount] = useState("");
+  const [bankIfsc, setBankIfsc] = useState("");
+  const [bankBranch, setBankBranch] = useState("");
+  const [upiId, setUpiId] = useState("");
 
   useEffect(() => {
     Promise.all([
       fetch(`/api/invoices/${id}`).then((r) => r.json()),
       fetch("/api/clients").then((r) => r.json()).catch(() => []),
-      fetch("/api/settings?keys=businessName,businessAddress,businessGst").then((r) => r.json()).catch(() => ({})),
+      fetch("/api/settings?keys=businessName,businessAddress,businessGst,bankName,bankAccount,bankIfsc,bankBranch,upiId").then((r) => r.json()).catch(() => ({})),
     ]).then(([inv, clientData, settings]) => {
       setClients(clientData);
 
@@ -142,6 +156,16 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
           amount: i.amount,
         })));
       }
+
+      // Load payment details from invoice or fall back to settings defaults
+      const pd: PaymentDetails = data.paymentDetails
+        ? (typeof data.paymentDetails === "string" ? JSON.parse(data.paymentDetails) : data.paymentDetails)
+        : {};
+      setBankName(pd.bankName || settings.bankName || "");
+      setBankAccount(pd.bankAccount || settings.bankAccount || "");
+      setBankIfsc(pd.bankIfsc || settings.bankIfsc || "");
+      setBankBranch(pd.bankBranch || settings.bankBranch || "");
+      setUpiId(pd.upiId || settings.upiId || "");
 
       // Fetch existing payment link
       fetch(`/api/invoices/${id}/payment-link`)
@@ -193,6 +217,13 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
       fromName: fromName || null,
       fromAddress: fromAddress || null,
       fromGst: fromGst || null,
+      paymentDetails: {
+        bankName,
+        bankAccount,
+        bankIfsc,
+        bankBranch,
+        upiId,
+      },
       items: items.filter((i) => i.description.trim()).map((i) => ({
         description: i.description,
         quantity: i.quantity,
@@ -571,6 +602,26 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
             placeholder="Payment terms, bank details, or any notes..."
             className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent resize-none outline-none focus:border-[var(--accent-clay)]"
           />
+        </div>
+
+        {/* Payment details */}
+        <div className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-4">
+          <h3 className="text-xs font-medium text-[var(--ink-muted)] uppercase tracking-wide mb-3">Payment Options</h3>
+          <p className="text-xs text-[var(--ink-muted)] mb-3">These details appear on the invoice for your client. Set defaults in Settings.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-[var(--ink-muted)]">Bank Transfer</p>
+              <input type="text" value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Bank name (e.g. HDFC Bank)" className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
+              <input type="text" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} placeholder="Account number" className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
+              <input type="text" value={bankIfsc} onChange={(e) => setBankIfsc(e.target.value)} placeholder="IFSC code" className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
+              <input type="text" value={bankBranch} onChange={(e) => setBankBranch(e.target.value)} placeholder="Branch (optional)" className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-[var(--ink-muted)]">UPI</p>
+              <input type="text" value={upiId} onChange={(e) => setUpiId(e.target.value)} placeholder="UPI ID (e.g. name@upi)" className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
+              <p className="text-xs text-[var(--ink-muted)]">Works with GPay, PhonePe, Paytm, and all UPI apps</p>
+            </div>
+          </div>
         </div>
 
         {/* Payment link */}

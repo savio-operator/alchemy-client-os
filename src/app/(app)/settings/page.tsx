@@ -14,6 +14,7 @@ import {
   LogOut,
   User,
   Key,
+  Building2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -72,6 +73,17 @@ export default function SettingsPage() {
   const [passwordMsg, setPasswordMsg] = useState("");
 
   const [originalEmail, setOriginalEmail] = useState("");
+  // Business & payment defaults
+  const [bizName, setBizName] = useState("");
+  const [bizAddress, setBizAddress] = useState("");
+  const [bizGst, setBizGst] = useState("");
+  const [bizBankName, setBizBankName] = useState("");
+  const [bizBankAccount, setBizBankAccount] = useState("");
+  const [bizBankIfsc, setBizBankIfsc] = useState("");
+  const [bizBankBranch, setBizBankBranch] = useState("");
+  const [bizUpiId, setBizUpiId] = useState("");
+  const [bizSaving, setBizSaving] = useState(false);
+  const [bizMsg, setBizMsg] = useState("");
 
   useEffect(() => {
     if (currentUser) {
@@ -167,6 +179,19 @@ export default function SettingsPage() {
         setIntegrations(data);
         setLoading(false);
       });
+    fetch("/api/settings?keys=businessName,businessAddress,businessGst,bankName,bankAccount,bankIfsc,bankBranch,upiId")
+      .then((r) => r.json())
+      .then((data) => {
+        setBizName(data.businessName || "");
+        setBizAddress(data.businessAddress || "");
+        setBizGst(data.businessGst || "");
+        setBizBankName(data.bankName || "");
+        setBizBankAccount(data.bankAccount || "");
+        setBizBankIfsc(data.bankIfsc || "");
+        setBizBankBranch(data.bankBranch || "");
+        setBizUpiId(data.upiId || "");
+      })
+      .catch(() => {});
   }, []);
 
   const toggleDark = () => {
@@ -367,6 +392,75 @@ export default function SettingsPage() {
           </div>
         </div>
       </section>
+
+      {/* Business & Payment */}
+      {currentUser?.role === "founder" && (
+        <section className="mb-8">
+          <h2 className="text-sm font-medium mb-3">Business & Payment Defaults</h2>
+          <div className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] p-5 space-y-4">
+            <p className="text-xs text-[var(--ink-muted)]">
+              These auto-fill on new invoices. You can override per invoice.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-[var(--ink-muted)] flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+                  Business Info
+                </p>
+                <input type="text" value={bizName} onChange={(e) => setBizName(e.target.value)} placeholder="Business name" className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors" />
+                <textarea value={bizAddress} onChange={(e) => setBizAddress(e.target.value)} placeholder="Address" rows={2} className="w-full px-3 py-2 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm resize-none focus:border-[var(--accent-clay)] transition-colors" />
+                <input type="text" value={bizGst} onChange={(e) => setBizGst(e.target.value)} placeholder="GST number (optional)" className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors" />
+              </div>
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-[var(--ink-muted)]">Bank Transfer</p>
+                <input type="text" value={bizBankName} onChange={(e) => setBizBankName(e.target.value)} placeholder="Bank name (e.g. HDFC Bank)" className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors" />
+                <input type="text" value={bizBankAccount} onChange={(e) => setBizBankAccount(e.target.value)} placeholder="Account number" className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors" />
+                <input type="text" value={bizBankIfsc} onChange={(e) => setBizBankIfsc(e.target.value)} placeholder="IFSC code" className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors" />
+                <input type="text" value={bizBankBranch} onChange={(e) => setBizBankBranch(e.target.value)} placeholder="Branch (optional)" className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors" />
+                <p className="text-xs font-medium text-[var(--ink-muted)] mt-2">UPI</p>
+                <input type="text" value={bizUpiId} onChange={(e) => setBizUpiId(e.target.value)} placeholder="UPI ID (e.g. name@upi)" className="w-full h-9 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] bg-[var(--bg)] text-sm focus:border-[var(--accent-clay)] transition-colors" />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={bizSaving}
+                className="gap-1"
+                onClick={async () => {
+                  setBizSaving(true);
+                  setBizMsg("");
+                  try {
+                    await fetch("/api/settings", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        businessName: bizName,
+                        businessAddress: bizAddress,
+                        businessGst: bizGst,
+                        bankName: bizBankName,
+                        bankAccount: bizBankAccount,
+                        bankIfsc: bizBankIfsc,
+                        bankBranch: bizBankBranch,
+                        upiId: bizUpiId,
+                      }),
+                    });
+                    setBizMsg("Saved");
+                  } catch {
+                    setBizMsg("Failed to save");
+                  } finally {
+                    setBizSaving(false);
+                  }
+                }}
+              >
+                <Building2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+                {bizSaving ? "Saving..." : "Save defaults"}
+              </Button>
+              {bizMsg && <span className="text-xs text-[var(--ink-muted)]">{bizMsg}</span>}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Discovery Engine */}
       <section className="mb-8">

@@ -88,6 +88,7 @@ export async function PATCH(
     fromAddress,
     fromGst,
     items,
+    paymentDetails,
   } = body;
 
   const existing = await db.select().from(invoices).where(eq(invoices.id, id)).get();
@@ -117,6 +118,7 @@ export async function PATCH(
   if (fromName !== undefined) updates.fromName = fromName;
   if (fromAddress !== undefined) updates.fromAddress = fromAddress;
   if (fromGst !== undefined) updates.fromGst = fromGst;
+  if (paymentDetails !== undefined) updates.paymentDetails = typeof paymentDetails === "string" ? paymentDetails : JSON.stringify(paymentDetails);
 
   // If items provided, delete existing and re-insert, recalculate amount
   if (Array.isArray(items)) {

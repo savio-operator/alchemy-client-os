@@ -11,6 +11,14 @@ interface LineItem {
   amount: number;
 }
 
+interface PaymentDetails {
+  bankName?: string;
+  bankAccount?: string;
+  bankIfsc?: string;
+  bankBranch?: string;
+  upiId?: string;
+}
+
 interface InvoiceData {
   id: string;
   number: string;
@@ -25,6 +33,7 @@ interface InvoiceData {
   fromName: string | null;
   fromAddress: string | null;
   fromGst: string | null;
+  paymentDetails: string | null;
   createdAt: string;
   items: LineItem[];
   client: { id: string; name: string } | null;
@@ -78,6 +87,13 @@ export default function InvoicePreviewPage({ params }: { params: Promise<{ id: s
   const taxAmount = subtotal * ((invoice.taxPercent || 0) / 100);
   const total = subtotal + taxAmount - (invoice.discountAmount || 0);
 
+  const pd: PaymentDetails = invoice.paymentDetails
+    ? (typeof invoice.paymentDetails === "string" ? JSON.parse(invoice.paymentDetails) : invoice.paymentDetails)
+    : {};
+  const hasBank = pd.bankName || pd.bankAccount;
+  const hasUpi = pd.upiId;
+  const hasPaymentInfo = hasBank || hasUpi;
+
   return (
     <>
       <style>{`
@@ -91,7 +107,7 @@ export default function InvoicePreviewPage({ params }: { params: Promise<{ id: s
       {/* Action bar — hidden in print */}
       <div className="no-print flex items-center justify-between max-w-4xl mx-auto px-6 py-4">
         <button
-          onClick={() => router.push(`/invoices/${id}`)}
+          onClick={() => router.push(`/finance/invoices/${id}`)}
           className="flex items-center gap-1.5 text-sm text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors"
         >
           <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
@@ -209,6 +225,33 @@ export default function InvoicePreviewPage({ params }: { params: Promise<{ id: s
           <div className="border-t border-gray-200 pt-6">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Notes / Terms</p>
             <p className="text-sm text-gray-600 whitespace-pre-line">{invoice.notes}</p>
+          </div>
+        )}
+
+        {/* Payment details */}
+        {hasPaymentInfo && (
+          <div className="border-t border-gray-200 pt-6 mt-6">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Payment Details</p>
+            <div className="flex flex-wrap gap-8">
+              {hasBank && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-1.5">Bank Transfer</p>
+                  <div className="text-sm text-gray-700 space-y-0.5">
+                    {pd.bankName && <p><span className="text-gray-500">Bank:</span> {pd.bankName}</p>}
+                    {pd.bankAccount && <p><span className="text-gray-500">A/C No:</span> {pd.bankAccount}</p>}
+                    {pd.bankIfsc && <p><span className="text-gray-500">IFSC:</span> {pd.bankIfsc}</p>}
+                    {pd.bankBranch && <p><span className="text-gray-500">Branch:</span> {pd.bankBranch}</p>}
+                  </div>
+                </div>
+              )}
+              {hasUpi && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-1.5">UPI Payment</p>
+                  <p className="text-sm text-gray-700"><span className="text-gray-500">UPI ID:</span> {pd.upiId}</p>
+                  <p className="text-xs text-gray-400 mt-1">Pay via GPay, PhonePe, Paytm, or any UPI app</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
