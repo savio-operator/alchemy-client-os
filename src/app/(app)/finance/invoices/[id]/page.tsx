@@ -108,7 +108,7 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/finance/invoices/${id}`).then((r) => r.json()),
+      fetch(`/api/invoices/${id}`).then((r) => r.json()),
       fetch("/api/clients").then((r) => r.json()).catch(() => []),
       fetch("/api/settings?keys=businessName,businessAddress,businessGst").then((r) => r.json()).catch(() => ({})),
     ]).then(([inv, clientData, settings]) => {
@@ -144,7 +144,7 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
       }
 
       // Fetch existing payment link
-      fetch(`/api/finance/invoices/${id}/payment-link`)
+      fetch(`/api/invoices/${id}/payment-link`)
         .then((r) => r.json())
         .then((d) => { if (d.paymentLink) setPaymentLink(d.paymentLink); })
         .catch(() => {});
@@ -200,7 +200,7 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
       })),
     };
 
-    await fetch(`/api/finance/invoices/${id}`, {
+    await fetch(`/api/invoices/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -209,7 +209,7 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
   };
 
   const handleStatusChange = async (newStatus: string) => {
-    const res = await fetch(`/api/finance/invoices/${id}`, {
+    const res = await fetch(`/api/invoices/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: newStatus }),
@@ -221,7 +221,7 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
 
   const handleDelete = async () => {
     if (!window.confirm("Delete this invoice?")) return;
-    const res = await fetch(`/api/finance/invoices/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/invoices/${id}`, { method: "DELETE" });
     if (res.ok) router.push("/finance/invoices");
   };
 
@@ -230,7 +230,7 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
     setSendingEmail(true);
     setEmailResult(null);
     try {
-      const res = await fetch(`/api/finance/invoices/${id}/send`, {
+      const res = await fetch(`/api/invoices/${id}/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -257,7 +257,7 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
     setCreatingPaymentLink(true);
     setPaymentLinkError(null);
     try {
-      const res = await fetch(`/api/finance/invoices/${id}/payment-link`, { method: "POST" });
+      const res = await fetch(`/api/invoices/${id}/payment-link`, { method: "POST" });
       const data = await res.json();
       if (res.ok && data.paymentLink) {
         setPaymentLink(data.paymentLink);

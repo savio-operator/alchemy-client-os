@@ -102,7 +102,7 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/finance/invoices").then((r) => r.json()),
+      fetch("/api/invoices").then((r) => r.json()),
       fetch("/api/clients").then((r) => r.json()).catch(() => []),
     ]).then(([invData, clientData]) => {
       // Map client names to invoices
@@ -143,7 +143,7 @@ export default function InvoicesPage() {
     e.preventDefault();
     if (!newInv.clientId || !newInv.number.trim()) return;
     setCreating(true);
-    const res = await fetch("/api/finance/invoices", {
+    const res = await fetch("/api/invoices", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -164,7 +164,7 @@ export default function InvoicesPage() {
   };
 
   const handleQuickStatus = async (id: string, status: string) => {
-    const res = await fetch(`/api/finance/invoices/${id}`, {
+    const res = await fetch(`/api/invoices/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
@@ -179,7 +179,7 @@ export default function InvoicesPage() {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Delete this invoice?")) return;
-    const res = await fetch(`/api/finance/invoices/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/invoices/${id}`, { method: "DELETE" });
     if (res.ok) {
       setInvoices((prev) => prev.filter((i) => i.id !== id));
     }

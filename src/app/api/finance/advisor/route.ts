@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import { db, initPromise } from "@/db";
-import { financeEntries, financeSettings, monthlyFixedCosts } from "@/db/schema";
+import { financeEntries, financeSettings, monthlyFixedCosts, financeMessages, financeConversations, clients, invoices, leads } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { callAIChat } from "@/lib/anthropic";
@@ -12,8 +13,9 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await initPromise;
 
-  const { messages } = await request.json() as {
+  const { messages, conversationId } = await request.json() as {
     messages: { role: "user" | "assistant"; content: string }[];
+    conversationId?: string;
   };
 
   // Gather all financial data for context
@@ -34,6 +36,11 @@ export async function POST(request: Request) {
       return [o.month, sal.reduce((s, x) => s + x.amount, 0) + rec.reduce((s, x) => s + x.amount, 0)];
     })
   );
+
+  // Fetch OS data for cross-referencing
+  const allClients = await db.select().from(clients).all();
+  const allInvoices = await db.select().from(invoices).all();
+  const allLeads = await db.select().from(leads).all();
 
   // Group entries by month
   const byMonth = new Map<string, typeof entries>();
@@ -67,19 +74,66 @@ ${salaries.map((x) => `- ${x.name}: ${currency} ${x.amount}`).join("\n") || "Non
 ### Recurring Expenses
 ${recurring.map((e) => `- ${e.name}: ${currency} ${e.amount}`).join("\n") || "None configured"}
 
+## Clients
+${allClients.map((c) => `- ${c.name} (${c.industry || "no industry"}, ${c.stage || "no stage"})${c.archivedAt ? " [ARCHIVED]" : ""}`).join("\n") || "No clients"}
+
+## Invoices
+${allInvoices.map((inv) => {
+  const client = allClients.find((c) => c.id === inv.clientId);
+  return `- #${inv.number}: ${currency} ${inv.amount} — ${inv.status} — ${client?.name || "Unknown client"} — Due: ${inv.dueDate || "N/A"}`;
+}).join("\n") || "No invoices"}
+
+## Leads
+${allLeads.map((l) => `- ${l.name}${l.company ? ` (${l.company})` : ""} — ${l.status}`).join("\n") || "No leads"}
+
 ## Financial Data
 ${monthSummaries || "No data yet"}
 
-You can help with:
+You have access to all OS data including clients, invoices, and leads. You can help with:
 - Can we pay salaries this month?
 - Year-end projections
 - Identifying risky months
 - Cost-cutting suggestions
 - What-if scenarios
 - Monthly financial summaries
+- Client revenue breakdown
+- Invoice status and collections
+- Lead pipeline value
 
 Be specific with numbers and reference actual data. Format currency amounts clearly.`;
 
+  // Save user message to DB
+  const lastUserMsg = messages[messages.length - 1];
+  if (conversationId && lastUserMsg?.role === "user") {
+    await db.insert(financeMessages).values({
+      id: crypto.randomUUID(),
+      conversationId,
+      role: "user",
+      content: lastUserMsg.content,
+      createdAt: new Date().toISOString(),
+    });
+
+    // Update conversation title from first message
+    const conv = await db.select().from(financeConversations).where(eq(financeConversations.id, conversationId)).get();
+    if (conv && (conv.title === "New conversation" || !conv.title) && messages.length === 1) {
+      await db.update(financeConversations)
+        .set({ title: lastUserMsg.content.slice(0, 50) })
+        .where(eq(financeConversations.id, conversationId));
+    }
+  }
+
   const text = await callAIChat(systemPrompt, messages);
+
+  // Save assistant response to DB
+  if (conversationId) {
+    await db.insert(financeMessages).values({
+      id: crypto.randomUUID(),
+      conversationId,
+      role: "assistant",
+      content: text,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
   return NextResponse.json({ message: text });
 }
