@@ -46,7 +46,7 @@ export async function GET(
 
           for (const msg of newMsgs) {
             const u = await db.select().from(users).where(eq(users.id, msg.userId)).get();
-            const data = JSON.stringify({ ...msg, userName: u?.name || "Unknown" });
+            const data = JSON.stringify({ ...msg, userName: u?.name || "Unknown", userRole: u?.role || "member" });
             controller.enqueue(encoder.encode(`data: ${data}\n\n`));
             if (msg.createdAt > lastSeen) lastSeen = msg.createdAt;
           }
@@ -61,6 +61,12 @@ export async function GET(
 
       // Start polling after initial delay
       setTimeout(poll, 3000);
+
+      // Send keepalive every 15s to prevent connection timeout
+      const keepalive = setInterval(() => {
+        if (!alive) { clearInterval(keepalive); return; }
+        try { controller.enqueue(encoder.encode(": keepalive\n\n")); } catch { clearInterval(keepalive); }
+      }, 15000);
     },
     cancel() {
       alive = false;

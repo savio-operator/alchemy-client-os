@@ -46,7 +46,7 @@ export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
         .catch(() => {});
     };
     poll();
-    const interval = setInterval(poll, 60_000);
+    const interval = setInterval(poll, 15_000);
     return () => clearInterval(interval);
   }, []);
 

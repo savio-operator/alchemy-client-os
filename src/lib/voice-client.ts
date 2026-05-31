@@ -1,6 +1,25 @@
 // Browser-only WebRTC voice/video/screenshare manager
 
-const STUN_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
+const ICE_SERVERS: RTCIceServer[] = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  // Free TURN relays for NAT traversal (metered.ca open TURN)
+  {
+    urls: "turn:a.relay.metered.ca:80",
+    username: "e8dd65b92f6dce4b5ebb4592",
+    credential: "uFdKisMhNJFiYbhL",
+  },
+  {
+    urls: "turn:a.relay.metered.ca:443",
+    username: "e8dd65b92f6dce4b5ebb4592",
+    credential: "uFdKisMhNJFiYbhL",
+  },
+  {
+    urls: "turn:a.relay.metered.ca:443?transport=tcp",
+    username: "e8dd65b92f6dce4b5ebb4592",
+    credential: "uFdKisMhNJFiYbhL",
+  },
+];
 
 export interface VoiceParticipant {
   userId: string;
@@ -27,12 +46,17 @@ export class VoiceClient {
   private screenStream: MediaStream | null = null;
   private cameraStream: MediaStream | null = null;
   private alive = true;
-  private seenSignalIds = new Set<string>();
+  private negotiating: Set<string> = new Set();
+  private knownParticipantIds: Set<string> = new Set();
 
   // Callbacks
   onRemoteStream: ((userId: string, stream: MediaStream, type: "audio" | "video" | "screen") => void) | null = null;
+  onRemoteStreamRemoved: ((userId: string) => void) | null = null;
   onParticipantLeft: ((userId: string) => void) | null = null;
   onParticipantsUpdate: ((participants: VoiceParticipant[]) => void) | null = null;
+  onCameraStream: ((stream: MediaStream | null) => void) | null = null;
+  onScreenStream: ((stream: MediaStream | null) => void) | null = null;
+  onScreenStopped: (() => void) | null = null;
 
   constructor(channelId: string, userId: string) {
     this.channelId = channelId;
@@ -51,14 +75,23 @@ export class VoiceClient {
     });
     const data = await res.json();
 
+    // Track known participants
+    if (data.participants) {
+      for (const p of data.participants as VoiceParticipant[]) {
+        this.knownParticipantIds.add(p.userId);
+      }
+    }
+
     // 3. Start polling for signals
     this.startPolling();
 
-    // 4. Create offers for existing participants
+    // 4. Create offers for existing participants (stagger to avoid race)
     if (data.participants) {
       for (const p of data.participants as VoiceParticipant[]) {
         if (p.userId !== this.userId) {
           await this.createOffer(p.userId);
+          // Small delay between offers to prevent signal congestion
+          await new Promise((r) => setTimeout(r, 200));
         }
       }
     }
@@ -73,24 +106,44 @@ export class VoiceClient {
         const res = await fetch(`/api/team-chat/channels/${this.channelId}/voice?signals=true`);
         const data = await res.json();
 
+        // Process signals sequentially to maintain order
         if (data.signals) {
           for (const signal of data.signals as SignalMessage[]) {
-            if (!this.seenSignalIds.has(signal.id)) {
-              this.seenSignalIds.add(signal.id);
+            if (signal.toUserId === this.userId) {
               await this.handleSignal(signal);
             }
           }
         }
 
-        if (data.participants && this.onParticipantsUpdate) {
-          this.onParticipantsUpdate(data.participants);
+        // Detect new participants and initiate connections
+        if (data.participants) {
+          const currentIds = new Set((data.participants as VoiceParticipant[]).map((p) => p.userId));
+
+          // New participants — they should send us offers, but if we have a higher ID we initiate
+          for (const p of data.participants as VoiceParticipant[]) {
+            if (p.userId !== this.userId && !this.knownParticipantIds.has(p.userId)) {
+              this.knownParticipantIds.add(p.userId);
+              // The joiner (newer participant) sends offers in their join(), so we just need to be ready
+            }
+          }
+
+          // Detect left participants
+          for (const knownId of this.knownParticipantIds) {
+            if (!currentIds.has(knownId) && knownId !== this.userId) {
+              this.removePeer(knownId);
+              this.knownParticipantIds.delete(knownId);
+            }
+          }
+
+          this.onParticipantsUpdate?.(data.participants);
         }
       } catch {
-        // Network error — ignore, retry next tick
+        // Network error — retry next tick
       }
-      if (this.alive) setTimeout(poll, 1000);
+      if (this.alive) setTimeout(poll, 800);
     };
-    poll();
+    // Start first poll quickly
+    setTimeout(poll, 300);
   }
 
   private async handleSignal(signal: SignalMessage) {
@@ -98,6 +151,12 @@ export class VoiceClient {
     const data = JSON.parse(payload);
 
     if (type === "offer") {
+      // Close existing peer if any — fresh negotiation
+      const existingPc = this.peers.get(fromUserId);
+      if (existingPc) {
+        existingPc.close();
+        this.peers.delete(fromUserId);
+      }
       const pc = this.getOrCreatePeer(fromUserId);
       await pc.setRemoteDescription(new RTCSessionDescription(data));
       const answer = await pc.createAnswer();
@@ -105,10 +164,12 @@ export class VoiceClient {
       await this.sendSignal(fromUserId, "answer", JSON.stringify(answer));
     } else if (type === "answer") {
       const pc = this.peers.get(fromUserId);
-      if (pc) await pc.setRemoteDescription(new RTCSessionDescription(data));
+      if (pc && pc.signalingState === "have-local-offer") {
+        await pc.setRemoteDescription(new RTCSessionDescription(data));
+      }
     } else if (type === "ice-candidate") {
       const pc = this.peers.get(fromUserId);
-      if (pc && data) {
+      if (pc && pc.remoteDescription && data) {
         try {
           await pc.addIceCandidate(new RTCIceCandidate(data));
         } catch {
@@ -121,7 +182,7 @@ export class VoiceClient {
   private getOrCreatePeer(remoteUserId: string): RTCPeerConnection {
     if (this.peers.has(remoteUserId)) return this.peers.get(remoteUserId)!;
 
-    const pc = new RTCPeerConnection({ iceServers: STUN_SERVERS });
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
     // Add local audio tracks
     if (this.localStream) {
@@ -129,7 +190,7 @@ export class VoiceClient {
     }
     // Add camera tracks if already on
     if (this.cameraStream) {
-      this.cameraStream.getTracks().forEach((track) => pc.addTrack(track, this.cameraStream!));
+      this.cameraStream.getVideoTracks().forEach((track) => pc.addTrack(track, this.cameraStream!));
     }
     // Add screen tracks if already sharing
     if (this.screenStream) {
@@ -152,8 +213,34 @@ export class VoiceClient {
     };
 
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
+      if (pc.connectionState === "failed") {
+        // Retry connection on failure
         this.removePeer(remoteUserId);
+        setTimeout(() => {
+          if (this.alive && this.knownParticipantIds.has(remoteUserId)) {
+            this.createOffer(remoteUserId);
+          }
+        }, 2000);
+      } else if (pc.connectionState === "disconnected") {
+        // Wait briefly — might recover
+        setTimeout(() => {
+          if (pc.connectionState === "disconnected") {
+            this.removePeer(remoteUserId);
+          }
+        }, 5000);
+      }
+    };
+
+    // Handle renegotiation needed (e.g., when tracks are added)
+    pc.onnegotiationneeded = async () => {
+      if (this.negotiating.has(remoteUserId)) return;
+      this.negotiating.add(remoteUserId);
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        await this.sendSignal(remoteUserId, "offer", JSON.stringify(offer));
+      } finally {
+        this.negotiating.delete(remoteUserId);
       }
     };
 
@@ -163,65 +250,92 @@ export class VoiceClient {
 
   private async createOffer(remoteUserId: string) {
     const pc = this.getOrCreatePeer(remoteUserId);
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    await this.sendSignal(remoteUserId, "offer", JSON.stringify(offer));
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await this.sendSignal(remoteUserId, "offer", JSON.stringify(offer));
+    } catch (err) {
+      console.error("Failed to create offer for", remoteUserId, err);
+    }
   }
 
   private async sendSignal(toUserId: string, type: string, payload: string) {
-    await fetch(`/api/team-chat/channels/${this.channelId}/voice`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "signal", toUserId, type, payload }),
-    });
+    try {
+      await fetch(`/api/team-chat/channels/${this.channelId}/voice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "signal", toUserId, type, payload }),
+      });
+    } catch {
+      // Signal send failed — will be retried on next poll cycle
+    }
   }
 
   async enableCamera(): Promise<MediaStream> {
-    this.cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
-    // Add video track to all existing peers and renegotiate
-    for (const [userId, pc] of this.peers) {
+    this.cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+    });
+    // Add video track to all existing peers — onnegotiationneeded will handle renegotiation
+    for (const [, pc] of this.peers) {
       this.cameraStream.getVideoTracks().forEach((track) => {
         pc.addTrack(track, this.cameraStream!);
       });
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      await this.sendSignal(userId, "offer", JSON.stringify(offer));
     }
+    this.onCameraStream?.(this.cameraStream);
     return this.cameraStream;
   }
 
   async disableCamera() {
     if (this.cameraStream) {
+      const tracks = this.cameraStream.getVideoTracks();
+      // Remove tracks from peers
+      for (const [, pc] of this.peers) {
+        const senders = pc.getSenders();
+        for (const track of tracks) {
+          const sender = senders.find((s) => s.track === track);
+          if (sender) pc.removeTrack(sender);
+        }
+      }
       this.cameraStream.getTracks().forEach((t) => t.stop());
       this.cameraStream = null;
+      this.onCameraStream?.(null);
     }
   }
 
   async shareScreen(): Promise<MediaStream> {
     this.screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-    // Add screen tracks to all existing peers and renegotiate
-    for (const [userId, pc] of this.peers) {
+    // Add screen tracks to all existing peers — onnegotiationneeded handles renegotiation
+    for (const [, pc] of this.peers) {
       this.screenStream.getTracks().forEach((track) => {
         pc.addTrack(track, this.screenStream!);
       });
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      await this.sendSignal(userId, "offer", JSON.stringify(offer));
     }
     // Handle user stopping share via browser native UI
     const videoTrack = this.screenStream.getVideoTracks()[0];
     if (videoTrack) {
       videoTrack.onended = () => {
         this.stopScreenShare();
+        this.onScreenStopped?.();
       };
     }
+    this.onScreenStream?.(this.screenStream);
     return this.screenStream;
   }
 
   async stopScreenShare() {
     if (this.screenStream) {
+      const tracks = this.screenStream.getTracks();
+      // Remove tracks from peers
+      for (const [, pc] of this.peers) {
+        const senders = pc.getSenders();
+        for (const track of tracks) {
+          const sender = senders.find((s) => s.track === track);
+          if (sender) pc.removeTrack(sender);
+        }
+      }
       this.screenStream.getTracks().forEach((t) => t.stop());
       this.screenStream = null;
+      this.onScreenStream?.(null);
     }
   }
 

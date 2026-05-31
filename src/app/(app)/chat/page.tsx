@@ -48,6 +48,8 @@ import {
   MonitorOff,
   Minimize2,
   Maximize2,
+  Menu,
+  Share2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/store/user";
@@ -97,6 +99,85 @@ const COMMON_EMOJIS_BY_CATEGORY: Record<string, string[]> = {
 };
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡", "🎉", "🔥", "👀", "✅"];
 
+// ─── Markdown rendering ──────────────────────────────────────────────────────
+
+function FormattedText({ text }: { text: string }) {
+  // Split by markdown tokens: **bold**, *italic*, `code`, ~~strike~~, ||spoiler||
+  // Process bold first, then italic, to prevent ** being consumed as two *
+  const segments: Array<{ type: string; content: string }> = [];
+  let remaining = text;
+
+  // Tokenize: scan left-to-right for the first matching pattern
+  while (remaining.length > 0) {
+    // Try each pattern at the earliest position
+    const patterns: Array<{ re: RegExp; type: string }> = [
+      { re: /\*\*(.+?)\*\*/, type: "bold" },
+      { re: /\*(.+?)\*/, type: "italic" },
+      { re: /`(.+?)`/, type: "code" },
+      { re: /~~(.+?)~~/, type: "strike" },
+      { re: /\|\|(.+?)\|\|/, type: "spoiler" },
+    ];
+
+    let earliest: { index: number; length: number; content: string; type: string } | null = null;
+
+    for (const p of patterns) {
+      const m = p.re.exec(remaining);
+      if (m && (earliest === null || m.index < earliest.index)) {
+        earliest = { index: m.index, length: m[0].length, content: m[1], type: p.type };
+      }
+    }
+
+    if (!earliest) {
+      segments.push({ type: "text", content: remaining });
+      break;
+    }
+
+    if (earliest.index > 0) {
+      segments.push({ type: "text", content: remaining.slice(0, earliest.index) });
+    }
+    segments.push({ type: earliest.type, content: earliest.content });
+    remaining = remaining.slice(earliest.index + earliest.length);
+  }
+
+  return (
+    <>
+      {segments.map((seg, i) => {
+        switch (seg.type) {
+          case "bold":
+            return <strong key={i}>{seg.content}</strong>;
+          case "italic":
+            return <em key={i}>{seg.content}</em>;
+          case "code":
+            return (
+              <code key={i} className="px-1 py-0.5 rounded text-xs" style={{ background: "var(--muted)" }}>
+                {seg.content}
+              </code>
+            );
+          case "strike":
+            return <del key={i}>{seg.content}</del>;
+          case "spoiler":
+            return (
+              <span
+                key={i}
+                className="rounded px-0.5 cursor-pointer transition-colors"
+                style={{ background: "var(--ink)", color: "var(--ink)" }}
+                onClick={(e) => {
+                  const el = e.currentTarget;
+                  el.style.background = "transparent";
+                  el.style.color = "var(--ink)";
+                }}
+              >
+                {seg.content}
+              </span>
+            );
+          default:
+            return <span key={i}>{seg.content}</span>;
+        }
+      })}
+    </>
+  );
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Avatar({ userId, name, size = 32 }: { userId: string; name: string; size?: number }) {
@@ -140,12 +221,16 @@ function PollMessage({ pollId, currentUserId }: { pollId: string; currentUserId?
   const [voting, setVoting] = useState(false);
 
   useEffect(() => {
-    if (!poll) {
+    const fetchPoll = () => {
       fetch(`/api/team-chat/polls/${pollId}`)
         .then((r) => r.json())
         .then((data) => setPoll(pollId, data))
         .catch(() => {});
-    }
+    };
+    if (!poll) fetchPoll();
+    // Auto-refresh poll results every 10s
+    const interval = setInterval(fetchPoll, 10000);
+    return () => clearInterval(interval);
   }, [pollId, poll, setPoll]);
 
   const handleVote = async (optionIndex: number) => {
@@ -742,6 +827,8 @@ export default function TeamChatPage() {
   const [showPollCreator, setShowPollCreator] = useState(false);
   const [showEmojiGrid, setShowEmojiGrid] = useState(false);
   const [mutedChannels, setMutedChannels] = useState<Set<string>>(new Set());
+  const [showMobileDrawer, setShowMobileDrawer] = useState(false);
+  const [shareMessage, setShareMessage] = useState<EnrichedMessage | null>(null);
   const [channelContextMenu, setChannelContextMenu] = useState<{
     channel: EnrichedChannel;
     pos: { x: number; y: number };
@@ -850,17 +937,34 @@ export default function TeamChatPage() {
     if (!activeChannelId) return;
     eventSourceRef.current?.close();
 
-    const es = new EventSource(`/api/team-chat/channels/${activeChannelId}/stream`);
-    es.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data) as EnrichedMessage;
-        addMessage(msg);
-        if (msg.userId !== user?.id) incrementUnread(activeChannelId);
-      } catch { /* ignore */ }
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryCount = 0;
+
+    const connect = () => {
+      const es = new EventSource(`/api/team-chat/channels/${activeChannelId}/stream`);
+      es.onmessage = (event) => {
+        retryCount = 0; // Reset on successful message
+        try {
+          const msg = JSON.parse(event.data) as EnrichedMessage;
+          addMessage(msg);
+          if (msg.userId !== user?.id) incrementUnread(activeChannelId);
+        } catch { /* ignore */ }
+      };
+      es.onerror = () => {
+        es.close();
+        // Exponential backoff: 1s, 2s, 4s, 8s, max 15s
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 15000);
+        retryCount++;
+        reconnectTimer = setTimeout(connect, delay);
+      };
+      eventSourceRef.current = es;
     };
-    es.onerror = () => {};
-    eventSourceRef.current = es;
-    return () => es.close();
+
+    connect();
+    return () => {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      eventSourceRef.current?.close();
+    };
   }, [activeChannelId, addMessage, incrementUnread, user?.id]);
 
   useEffect(() => {
@@ -982,6 +1086,17 @@ export default function TeamChatPage() {
       setVoiceParticipants(participants);
     };
 
+    client.onCameraStream = (stream) => {
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        if (stream) localVideoRef.current.play().catch(() => {});
+      }
+    };
+
+    client.onScreenStopped = () => {
+      setScreenSharing(false);
+    };
+
     voiceClientRef.current = client;
     setConnectedVoice(channelId);
     setMuted(false);
@@ -991,6 +1106,7 @@ export default function TeamChatPage() {
       await client.join();
     } catch (err) {
       console.error("Voice join failed:", err);
+      alert("Could not join voice channel. Please check your microphone permissions.");
       voiceClientRef.current = null;
       setConnectedVoice(null);
     }
@@ -1011,7 +1127,10 @@ export default function TeamChatPage() {
   }, [deafened]);
 
   const handleToggleCamera = useCallback(async () => {
-    if (!voiceClientRef.current) return;
+    if (!voiceClientRef.current) {
+      alert("Join a voice channel first to use camera.");
+      return;
+    }
     if (cameraOn) {
       await voiceClientRef.current.disableCamera();
       setCameraOn(false);
@@ -1021,12 +1140,16 @@ export default function TeamChatPage() {
         setCameraOn(true);
       } catch (err) {
         console.error("Camera failed:", err);
+        alert("Could not access camera. Please check your camera permissions in browser settings.");
       }
     }
   }, [cameraOn]);
 
   const handleToggleScreen = useCallback(async () => {
-    if (!voiceClientRef.current) return;
+    if (!voiceClientRef.current) {
+      alert("Join a voice channel first to share screen.");
+      return;
+    }
     if (screenSharing) {
       await voiceClientRef.current.stopScreenShare();
       setScreenSharing(false);
@@ -1036,6 +1159,9 @@ export default function TeamChatPage() {
         setScreenSharing(true);
       } catch (err) {
         console.error("Screen share failed:", err);
+        // User may have cancelled the browser dialog — not an error
+        if (err instanceof DOMException && err.name === "NotAllowedError") return;
+        alert("Could not share screen. Please check your permissions.");
       }
     }
   }, [screenSharing]);
@@ -1160,6 +1286,23 @@ export default function TeamChatPage() {
     setSelectedMessage(null);
   }, [activeChannelId, setMessages, setSelectedMessage]);
 
+  const handleShareToChannel = useCallback(async (targetChannelId: string) => {
+    if (!shareMessage) return;
+    const forwardContent = `> **${shareMessage.userName || "Unknown"}**: ${shareMessage.content || ""}${shareMessage.mediaUrl ? "\n> (attachment)" : ""}\n\n`;
+    try {
+      await fetch(`/api/team-chat/channels/${targetChannelId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: forwardContent,
+          mediaUrl: shareMessage.mediaUrl || null,
+          mediaType: shareMessage.mediaType || null,
+        }),
+      });
+    } catch { /* */ }
+    setShareMessage(null);
+  }, [shareMessage]);
+
   const handleReact = useCallback(async (msgId: string, emoji: string) => {
     try {
       await fetch(`/api/team-chat/channels/${activeChannelId}/messages/${msgId}/react`, {
@@ -1188,9 +1331,14 @@ export default function TeamChatPage() {
         await fetch(`/api/team-chat/channels/${activeChannelId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: "", mediaUrl: url, mediaType }),
+          body: JSON.stringify({ content: file.name, mediaUrl: url, mediaType }),
         });
+      } else {
+        const err = await uploadRes.json().catch(() => ({ error: "Upload failed" }));
+        alert(err.error || "Upload failed");
       }
+    } catch {
+      alert("Upload failed. Please try again.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -1281,15 +1429,25 @@ export default function TeamChatPage() {
     setMentionQuery(null);
   };
 
-  const insertFormat = (prefix: string, suffix: string = prefix) => {
+  const selectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+
+  // Track selection changes so format buttons work on mobile (where tapping a button blurs the textarea)
+  const trackSelection = useCallback(() => {
     const ta = inputRef.current;
-    if (!ta) return;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
+    if (ta) {
+      selectionRef.current = { start: ta.selectionStart, end: ta.selectionEnd };
+    }
+  }, []);
+
+  const insertFormat = (prefix: string, suffix: string = prefix) => {
+    const { start, end } = selectionRef.current;
     const selected = input.slice(start, end);
     const newVal = input.slice(0, start) + prefix + selected + suffix + input.slice(end);
     setInput(newVal);
-    setTimeout(() => { ta.focus(); ta.setSelectionRange(start + prefix.length, end + prefix.length); }, 0);
+    setTimeout(() => {
+      const ta = inputRef.current;
+      if (ta) { ta.focus(); ta.setSelectionRange(start + prefix.length, end + prefix.length); }
+    }, 0);
   };
 
   const onContextMenu = (e: React.MouseEvent, msg: EnrichedMessage) => {
@@ -1592,6 +1750,13 @@ export default function TeamChatPage() {
         {/* Channel Header */}
         <div className="flex items-center justify-between px-4 h-12 shrink-0 bg-[var(--surface)] border-b border-[var(--rule)] z-10">
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowMobileDrawer(true)}
+              className="md:hidden p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors"
+              title="Channels"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
             {activeChannel?.type === "group" ? (
               <Hash className="w-5 h-5 text-[var(--ink-muted)]" strokeWidth={2} />
             ) : activeChannel?.type === "direct" ? (
@@ -1719,10 +1884,10 @@ export default function TeamChatPage() {
                 )}
 
                 <div
-                  className="group flex gap-3 px-2 py-0.5 rounded relative"
+                  className="group flex gap-3 px-2 py-1.5 rounded relative"
                   style={{
                     background: msg.pinnedAt ? "rgba(250,166,26,0.06)" : "transparent",
-                    marginTop: isGrouped ? 0 : 16,
+                    marginTop: isGrouped ? 2 : 20,
                   }}
                   onContextMenu={(e) => onContextMenu(e, msg)}
                   onMouseEnter={(e) => {
@@ -1799,7 +1964,7 @@ export default function TeamChatPage() {
                           <>
                             {msg.content && (
                               <p className="text-sm whitespace-pre-wrap break-words text-[var(--ink)]">
-                                {msg.content}
+                                <FormattedText text={msg.content} />
                                 {msg.editedAt && (
                                   <span className="text-xs ml-1 text-[var(--ink-muted)]">(edited)</span>
                                 )}
@@ -1808,10 +1973,24 @@ export default function TeamChatPage() {
                           </>
                         )}
                         {msg.mediaUrl && msg.mediaType === "image" && (
-                          <img src={msg.mediaUrl} alt="" className="max-w-sm rounded-md mt-1 border border-[var(--rule)]" />
+                          <img src={msg.mediaUrl} alt="" className="max-w-xs sm:max-w-sm rounded-md mt-1 border border-[var(--rule)]" />
                         )}
                         {msg.mediaUrl && msg.mediaType === "video" && (
-                          <video src={msg.mediaUrl} controls className="max-w-sm rounded-md mt-1" />
+                          <video src={msg.mediaUrl} controls className="max-w-xs sm:max-w-sm rounded-md mt-1" />
+                        )}
+                        {msg.mediaUrl && msg.mediaType === "audio" && (
+                          <audio src={msg.mediaUrl} controls className="mt-1 max-w-xs sm:max-w-sm" />
+                        )}
+                        {msg.mediaUrl && msg.mediaType === "file" && (
+                          <a
+                            href={msg.mediaUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 mt-1 px-3 py-2 rounded-md text-sm border border-[var(--rule)] bg-[var(--bg)] text-[var(--ink)] hover:bg-[var(--muted)] transition-colors max-w-xs"
+                          >
+                            <Upload className="w-4 h-4 shrink-0 text-[var(--ink-muted)]" />
+                            <span className="truncate">{msg.content || "Download file"}</span>
+                          </a>
                         )}
                       </>
                     )}
@@ -1857,6 +2036,13 @@ export default function TeamChatPage() {
                       title="Reply"
                     >
                       <Reply className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShareMessage(msg); }}
+                      className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]"
+                      title="Share to..."
+                    >
+                      <Share2 className="w-4 h-4" />
                     </button>
                     {isOwn && (
                       <button
@@ -1976,27 +2162,27 @@ export default function TeamChatPage() {
 
             {/* Format toolbar */}
             <div className="flex items-center gap-1 px-3 py-1 rounded-t-lg bg-[var(--bg)]">
-              <button onClick={() => insertFormat("**")} className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]" title="Bold">
+              <button onMouseDown={(e) => e.preventDefault()} onClick={() => insertFormat("**")} className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]" title="Bold">
                 <Bold className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => insertFormat("*")} className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]" title="Italic">
+              <button onMouseDown={(e) => e.preventDefault()} onClick={() => insertFormat("*")} className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]" title="Italic">
                 <Italic className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => insertFormat("`")} className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]" title="Code">
+              <button onMouseDown={(e) => e.preventDefault()} onClick={() => insertFormat("`")} className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]" title="Code">
                 <Code className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => insertFormat("~~")} className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]" title="Strikethrough">
+              <button onMouseDown={(e) => e.preventDefault()} onClick={() => insertFormat("~~")} className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]" title="Strikethrough">
                 <span className="text-xs font-medium line-through">S</span>
               </button>
               <div className="w-px h-4 mx-1 bg-[var(--rule)]" />
-              <button onClick={() => insertFormat("||")} className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]" title="Spoiler">
+              <button onMouseDown={(e) => e.preventDefault()} onClick={() => insertFormat("||")} className="p-1 rounded text-[var(--ink-muted)] hover:text-[var(--ink)]" title="Spoiler">
                 <span className="text-xs font-medium">||</span>
               </button>
             </div>
 
             {/* Main input row */}
             <div className="flex items-end gap-2 px-3 py-2 rounded-b-lg bg-[var(--bg)]">
-              <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFileUpload} />
+              <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip" className="hidden" onChange={handleFileUpload} />
 
               {/* + button with popup menu */}
               <div className="relative" ref={plusMenuRef}>
@@ -2057,6 +2243,8 @@ export default function TeamChatPage() {
                   value={input}
                   onChange={handleInputChange}
                   onKeyDown={handleInputKeyDown}
+                  onSelect={trackSelection}
+                  onBlur={trackSelection}
                   placeholder={`Message ${activeChannel?.type === "group" ? "#" : ""}${activeChannel?.displayName || activeChannel?.name || "..."}`}
                   rows={1}
                   disabled={sending}
@@ -2154,6 +2342,165 @@ export default function TeamChatPage() {
         )}
       </AnimatePresence>
 
+      {/* ── Mobile Channel Drawer ── */}
+      <AnimatePresence>
+        {showMobileDrawer && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-black/50 md:hidden"
+              onClick={() => setShowMobileDrawer(false)}
+            />
+            <motion.div
+              initial={{ x: -280 }}
+              animate={{ x: 0 }}
+              exit={{ x: -280 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="fixed left-0 top-0 bottom-0 z-50 w-[280px] flex flex-col bg-[var(--bg)] border-r border-[var(--rule)] md:hidden"
+            >
+              <div className="flex items-center justify-between px-4 h-12 shrink-0 font-semibold text-sm border-b border-[var(--rule)]">
+                <span className="text-[var(--ink)]">Adchemy Team</span>
+                <button onClick={() => setShowMobileDrawer(false)} className="p-1 text-[var(--ink-muted)]">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto py-2" style={{ scrollbarWidth: "thin" }}>
+                {/* DMs */}
+                <div className="mb-2">
+                  <div className="flex items-center px-4 py-1 text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                    Direct Messages
+                  </div>
+                  {dmChannels.map((ch) => (
+                    <ChannelItem
+                      key={ch.id}
+                      channel={ch}
+                      active={ch.id === activeChannelId}
+                      icon={<AtSign className="w-4 h-4" strokeWidth={1.5} />}
+                      onSelect={() => { setActiveChannel(ch.id); setShowMobileDrawer(false); }}
+                      canManage={canManage}
+                    />
+                  ))}
+                  <button
+                    onClick={() => setShowNewDm(!showNewDm)}
+                    className="w-full flex items-center gap-2 px-4 py-1.5 text-sm text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>New DM</span>
+                  </button>
+                </div>
+
+                {/* Text Channels */}
+                <div className="mb-2">
+                  <button
+                    className="flex items-center gap-1 px-2 py-1 w-full text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)] hover:text-[var(--ink)]"
+                    onClick={() => setTextChannelsOpen((v) => !v)}
+                  >
+                    {textChannelsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                    <span>Text Channels</span>
+                  </button>
+                  {textChannelsOpen && textChannels.map((ch) => (
+                    <ChannelItem
+                      key={ch.id}
+                      channel={ch}
+                      active={ch.id === activeChannelId}
+                      icon={<Hash className="w-4 h-4" strokeWidth={1.5} />}
+                      onSelect={() => { setActiveChannel(ch.id); setShowMobileDrawer(false); }}
+                      canManage={canManage}
+                      isMuted={mutedChannels.has(ch.id)}
+                    />
+                  ))}
+                </div>
+
+                {/* Voice Channels */}
+                <div className="mb-2">
+                  <button
+                    className="flex items-center gap-1 px-2 py-1 w-full text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)] hover:text-[var(--ink)]"
+                    onClick={() => setVoiceChannelsOpen((v) => !v)}
+                  >
+                    {voiceChannelsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                    <span>Voice Channels</span>
+                  </button>
+                  {voiceChannelsOpen && voiceChannels.map((ch) => (
+                    <div key={ch.id}>
+                      <ChannelItem
+                        channel={ch}
+                        active={connectedVoice === ch.id}
+                        icon={<Volume2 className="w-4 h-4" strokeWidth={1.5} />}
+                        onSelect={() => { handleVoiceConnect(ch.id); setShowMobileDrawer(false); }}
+                        canManage={canManage}
+                        isVoice
+                      />
+                      {(voiceChannelParticipants[ch.id] || []).length > 0 && (
+                        <div className="pl-7 pb-1 flex flex-col gap-0.5">
+                          {(voiceChannelParticipants[ch.id] || []).map((p) => (
+                            <div key={p.userId} className="flex items-center gap-1.5 text-xs py-0.5 text-[var(--ink-muted)]">
+                              <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", flexShrink: 0, background: p.muted ? "#f0b132" : "#23a55a" }} />
+                              <span className="truncate">{p.userId === user?.id ? `${p.name} (you)` : p.name}</span>
+                              {p.muted && <MicOff className="w-2.5 h-2.5 shrink-0 opacity-60" />}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {voiceChannelsOpen && voiceChannels.length === 0 && (
+                    <p className="text-xs text-[var(--ink-muted)] px-4 py-1">No voice channels</p>
+                  )}
+                </div>
+              </div>
+
+              {/* New DM form (mobile) */}
+              <AnimatePresence>
+                {showNewDm && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="px-3 py-2 overflow-hidden border-t border-[var(--rule)]"
+                  >
+                    <p className="text-xs mb-1 text-[var(--ink-muted)]">New Direct Message</p>
+                    <div className="max-h-40 overflow-y-auto">
+                      {teamUsers
+                        .filter((u) => u.id !== user?.id)
+                        .map((u) => (
+                          <button
+                            key={u.id}
+                            onClick={() => { handleCreateDm(u.id); setShowMobileDrawer(false); }}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left text-[var(--ink)] hover:bg-[var(--muted)] transition-colors"
+                          >
+                            <Avatar userId={u.id} name={u.name} size={24} />
+                            <span className="truncate">{u.name}</span>
+                          </button>
+                        ))}
+                    </div>
+                    <button
+                      onClick={() => setShowNewDm(false)}
+                      className="text-xs mt-1 text-[var(--ink-muted)] hover:text-[var(--ink)]"
+                    >
+                      Cancel
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* User info at bottom */}
+              {user && (
+                <div className="flex items-center gap-2 px-2 py-2 shrink-0 border-t border-[var(--rule)]">
+                  <Avatar userId={user.id} name={user.name} size={32} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate text-[var(--ink)]">{user.name}</p>
+                    <p className="text-xs truncate text-[var(--ink-muted)]">{user.role}</p>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* ── Context Menu ── */}
       <AnimatePresence>
         {selectedMessage && contextMenuPos && (
@@ -2200,6 +2547,11 @@ export default function TeamChatPage() {
               label="Copy Text"
               onClick={() => { navigator.clipboard.writeText(selectedMessage.content).catch(() => {}); setSelectedMessage(null); }}
             />
+            <ContextMenuItem
+              icon={<Share2 className="w-4 h-4" />}
+              label="Share to..."
+              onClick={() => { setShareMessage(selectedMessage); setSelectedMessage(null); }}
+            />
             {(selectedMessage.userId === user?.id || isFounder) && (
               <>
                 <div className="h-px my-1 bg-[var(--rule)]" />
@@ -2239,6 +2591,71 @@ export default function TeamChatPage() {
         )}
       </AnimatePresence>
 
+      {/* ── Share Message Modal ── */}
+      <AnimatePresence>
+        {shareMessage && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/50"
+              onClick={() => setShareMessage(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="fixed z-50 rounded-xl border bg-[var(--bg)] border-[var(--rule)] p-4 w-[320px]"
+              style={{
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-[var(--ink)]">Share message to...</h3>
+                <button onClick={() => setShareMessage(null)} className="p-1 text-[var(--ink-muted)]">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Preview */}
+              <div className="mb-3 p-2 rounded text-xs border border-[var(--rule)] bg-[var(--surface)] text-[var(--ink-muted)]">
+                <span className="font-medium text-[var(--ink)]">{shareMessage.userName}: </span>
+                {shareMessage.content?.slice(0, 100)}{(shareMessage.content?.length ?? 0) > 100 ? "..." : ""}
+                {shareMessage.mediaUrl && " (attachment)"}
+              </div>
+
+              {/* Channel list */}
+              <div className="max-h-60 overflow-y-auto flex flex-col gap-0.5">
+                {channels
+                  .filter((ch) => ch.type !== "voice" && ch.id !== activeChannelId)
+                  .map((ch) => (
+                    <button
+                      key={ch.id}
+                      onClick={() => handleShareToChannel(ch.id)}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-left text-[var(--ink)] hover:bg-[var(--muted)] transition-colors"
+                    >
+                      {ch.type === "group" ? (
+                        <Hash className="w-4 h-4 text-[var(--ink-muted)]" />
+                      ) : (
+                        <AtSign className="w-4 h-4 text-[var(--ink-muted)]" />
+                      )}
+                      <span className="truncate">{ch.displayName || ch.name || "Direct Message"}</span>
+                    </button>
+                  ))}
+                {channels.filter((ch) => ch.type !== "voice" && ch.id !== activeChannelId).length === 0 && (
+                  <p className="text-xs text-center py-4 text-[var(--ink-muted)]">No other channels to share to</p>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* ── Channel Settings Modal ── */}
       <AnimatePresence>
         {settingsChannel && (
@@ -2264,8 +2681,10 @@ export default function TeamChatPage() {
             style={{
               position: "fixed",
               bottom: 80,
-              right: 20,
-              width: 360,
+              right: 12,
+              left: 12,
+              maxWidth: 360,
+              marginLeft: "auto",
               zIndex: 200,
               background: "var(--surface)",
               border: "1px solid var(--rule)",
@@ -2340,7 +2759,15 @@ export default function TeamChatPage() {
                           flexShrink: 0,
                         }}
                       >
-                        {videoStream && !isMe ? (
+                        {isMe && cameraOn ? (
+                          <video
+                            ref={localVideoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }}
+                          />
+                        ) : videoStream && !isMe ? (
                           <video
                             ref={(el) => {
                               if (el) {

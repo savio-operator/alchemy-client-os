@@ -4,13 +4,36 @@ import { uploadToR2 } from "@/lib/r2";
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB for documents
 const ALLOWED_TYPES: Record<string, string> = {
+  // Images
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/gif": "gif",
   "image/webp": "webp",
+  "image/heic": "heic",
+  "image/heif": "heif",
+  "image/svg+xml": "svg",
+  // Videos
   "video/mp4": "mp4",
   "video/webm": "webm",
+  "video/quicktime": "mov",
+  // Audio
+  "audio/mpeg": "mp3",
+  "audio/wav": "wav",
+  "audio/ogg": "ogg",
+  "audio/webm": "webm",
+  "audio/mp4": "m4a",
+  // Documents
+  "application/pdf": "pdf",
+  "application/msword": "doc",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.ms-excel": "xls",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.ms-powerpoint": "ppt",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+  "text/plain": "txt",
+  "application/zip": "zip",
 };
 
 export async function POST(request: Request) {
@@ -31,11 +54,13 @@ export async function POST(request: Request) {
     }
 
     const isVideo = file.type.startsWith("video/");
-    const maxSize = isVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+    const isImage = file.type.startsWith("image/");
+    const isAudio = file.type.startsWith("audio/");
+    const maxSize = isVideo ? MAX_VIDEO_SIZE : isImage ? MAX_IMAGE_SIZE : MAX_FILE_SIZE;
 
     if (file.size > maxSize) {
       return NextResponse.json(
-        { error: `File too large. Max ${isVideo ? "50MB" : "10MB"}` },
+        { error: `File too large. Max ${isVideo ? "50MB" : isImage ? "10MB" : "25MB"}` },
         { status: 400 }
       );
     }
@@ -43,9 +68,11 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const { url } = await uploadToR2(buffer, file.type, ext);
 
+    const mediaType = isVideo ? "video" : isImage ? "image" : isAudio ? "audio" : "file";
+
     return NextResponse.json({
       url,
-      mediaType: isVideo ? "video" : "image",
+      mediaType,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Upload failed";

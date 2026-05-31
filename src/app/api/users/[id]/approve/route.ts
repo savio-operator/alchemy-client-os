@@ -43,6 +43,13 @@ export async function POST(
           { status: 400 }
         );
       }
+      // Prevent changing another founder's role
+      if (targetUser.role === "founder" && id !== currentUser.id) {
+        return NextResponse.json(
+          { error: "Cannot change another founder's role" },
+          { status: 403 }
+        );
+      }
       const updated = await updateUserRole(id, role);
       return NextResponse.json(updated);
     }
