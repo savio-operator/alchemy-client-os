@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Command, PanelRight, LogOut, Pencil, Check, X } from "lucide-react";
+import { Bell, Command, PanelRight, LogOut, Pencil, Check, X, Menu } from "lucide-react";
 import { useCommandPalette } from "@/store/command-palette";
 import { useDrawer } from "@/store/drawer";
 import { useUser } from "@/store/user";
+import { useSidebar } from "@/store/sidebar";
 
 interface Notification {
   id: string;
@@ -26,6 +27,7 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
   const { setOpen: openPalette } = useCommandPalette();
   const { toggle: toggleDrawer } = useDrawer();
   const { clearUser, setUser } = useUser();
+  const { setMobileOpen } = useSidebar();
   const [notifCount, setNotifCount] = useState(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifs, setShowNotifs] = useState(false);
@@ -132,8 +134,16 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
   };
 
   return (
-    <header className="h-14 border-b border-[var(--rule)] flex items-center justify-between px-4 shrink-0 bg-[var(--bg)]">
-      {/* Breadcrumbs */}
+    <header className="h-14 border-b border-[var(--rule)] flex items-center justify-between px-3 md:px-4 shrink-0 bg-[var(--bg)]">
+      {/* Mobile hamburger + Breadcrumbs */}
+      <div className="flex items-center gap-2 min-w-0">
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)] transition-colors md:hidden"
+          aria-label="Open menu"
+        >
+          <Menu className="w-5 h-5 text-[var(--ink-muted)]" strokeWidth={1.5} />
+        </button>
       <nav className="flex items-center gap-1.5 text-sm min-w-0">
         {breadcrumbs.map((crumb, i) => (
           <span key={i} className="flex items-center gap-1.5 min-w-0">
@@ -151,6 +161,7 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
           </span>
         ))}
       </nav>
+      </div>
 
       {/* Actions */}
       <div className="flex items-center gap-1">
@@ -184,7 +195,7 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
           </button>
 
           {showNotifs && (
-            <div className="absolute right-0 top-10 w-80 max-h-96 bg-[var(--surface)] border border-[var(--rule)] rounded-[var(--radius)] shadow-lg z-50 flex flex-col">
+            <div className="absolute right-0 top-10 w-[calc(100vw-2rem)] sm:w-80 max-h-96 bg-[var(--surface)] border border-[var(--rule)] rounded-[var(--radius)] shadow-lg z-50 flex flex-col">
               <div className="px-3 py-2 border-b border-[var(--rule)] flex items-center justify-between">
                 <span className="text-sm font-medium">Notifications</span>
                 {notifCount > 0 && (

@@ -570,7 +570,7 @@ export default function TeamPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-10">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       <div className="flex items-center gap-3 mb-6">
         <Users className="w-5 h-5 text-[var(--ink-muted)]" strokeWidth={1.5} />
         <h1 className="text-2xl font-semibold font-serif">Team</h1>
@@ -598,7 +598,7 @@ export default function TeamPage() {
                 {pendingUsers.map((u) => (
                   <div
                     key={u.id}
-                    className="flex items-center justify-between p-4"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4"
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
@@ -663,7 +663,7 @@ export default function TeamPage() {
                       className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] overflow-hidden"
                     >
                       {/* Header row */}
-                      <div className="flex items-center justify-between p-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-[var(--accent-clay)]/10 flex items-center justify-center">
                             <span className="text-xs font-medium text-[var(--accent-clay)]">

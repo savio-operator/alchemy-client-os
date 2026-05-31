@@ -1314,8 +1314,8 @@ export default function TeamChatPage() {
         setChannelContextMenu(null);
       }}
     >
-      {/* ── Left Sidebar ── */}
-      <div className="flex flex-col shrink-0 overflow-hidden w-60 bg-[var(--bg)] border-r border-[var(--rule)]">
+      {/* ── Left Sidebar — hidden on mobile ── */}
+      <div className="hidden md:flex flex-col shrink-0 overflow-hidden w-60 bg-[var(--bg)] border-r border-[var(--rule)]">
         {/* Server header */}
         <div className="flex items-center justify-between px-4 h-12 shrink-0 font-semibold text-sm border-b border-[var(--rule)]">
           <span className="text-[var(--ink)]">Adchemy Team</span>
@@ -2110,7 +2110,7 @@ export default function TeamChatPage() {
         )}
       </div>
 
-      {/* ── Right: Member List ── */}
+      {/* ── Right: Member List — hidden on mobile ── */}
       <AnimatePresence>
         {showMemberList && activeChannelId && (
           <motion.div
@@ -2118,7 +2118,7 @@ export default function TeamChatPage() {
             animate={{ width: 240, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="shrink-0 overflow-hidden bg-[var(--bg)] border-l border-[var(--rule)]"
+            className="hidden md:block shrink-0 overflow-hidden bg-[var(--bg)] border-l border-[var(--rule)]"
           >
             <div className="w-[240px] h-full overflow-y-auto py-4 px-2" style={{ scrollbarWidth: "thin" }}>
               {onlineMembers.length > 0 && (

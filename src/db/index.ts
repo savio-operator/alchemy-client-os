@@ -397,6 +397,77 @@ async function initTables() {
     );
   `);
 
+  // Finance tables
+  await client.executeMultiple(`
+    CREATE TABLE IF NOT EXISTS finance_entries (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
+      type TEXT NOT NULL,
+      description TEXT NOT NULL,
+      category TEXT,
+      amount REAL NOT NULL,
+      client TEXT,
+      month TEXT NOT NULL,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS finance_settings (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      currency TEXT NOT NULL DEFAULT 'INR',
+      expected_monthly_income REAL DEFAULT 0,
+      salaries TEXT,
+      recurring_expenses TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_finance_settings_user
+      ON finance_settings(user_id);
+
+    CREATE TABLE IF NOT EXISTS monthly_fixed_costs (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      month TEXT NOT NULL,
+      salaries TEXT,
+      recurring_expenses TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_monthly_fixed_costs_user_month
+      ON monthly_fixed_costs(user_id, month);
+
+    CREATE TABLE IF NOT EXISTS finance_conversations (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS finance_messages (
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL REFERENCES finance_conversations(id) ON DELETE CASCADE,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS forecasts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      period TEXT,
+      created_at TEXT NOT NULL
+    );
+  `);
+
   // Challenges table
   await client.executeMultiple(`
     CREATE TABLE IF NOT EXISTS challenges (

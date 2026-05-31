@@ -82,9 +82,31 @@ export async function POST(request: Request) {
   if (!convId) {
     convId = crypto.randomUUID();
     const title = message.slice(0, 60) + (message.length > 60 ? "..." : "");
+
+    // For "global" AI chat, we need a valid clientId — create or reuse a system client
+    let resolvedClientId = clientId;
+    if (clientId === "global") {
+      const systemClient = await db.select().from(clients).where(eq(clients.slug, "adchemy-global")).get();
+      if (systemClient) {
+        resolvedClientId = systemClient.id;
+      } else {
+        const sysId = crypto.randomUUID();
+        await db.insert(clients).values({
+          id: sysId,
+          name: "Adchemy Global",
+          slug: "adchemy-global",
+          industry: null,
+          stage: null,
+          createdAt: now,
+          archivedAt: now, // archived so it doesn't show in sidebar
+        }).run();
+        resolvedClientId = sysId;
+      }
+    }
+
     await db
       .insert(conversations)
-      .values({ id: convId, clientId, userId: user.id, title, createdAt: now, updatedAt: now })
+      .values({ id: convId, clientId: resolvedClientId, userId: user.id, title, createdAt: now, updatedAt: now })
       .run();
   }
 

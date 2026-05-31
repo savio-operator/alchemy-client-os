@@ -114,7 +114,7 @@ export default async function HomePage() {
             label: "Pending invoices",
             value: pendingInvoices?.[0]?.value ?? 0,
             icon: Receipt,
-            href: "/invoices",
+            href: "/finance/invoices",
           },
           {
             label: "New leads",
@@ -134,7 +134,7 @@ export default async function HomePage() {
   ];
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       {/* Greeting */}
       <h1 className="text-3xl font-serif font-semibold mb-1">
         {getGreeting()}, {user.name.split(" ")[0]}

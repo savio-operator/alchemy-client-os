@@ -13,6 +13,7 @@ import {
   Users,
   CheckCircle,
   MessageSquare,
+  Wallet,
 } from "lucide-react";
 import { useSidebar } from "@/store/sidebar";
 import {
@@ -29,7 +30,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
-  const { expanded, toggle } = useSidebar();
+  const { expanded, toggle, setMobileOpen } = useSidebar();
   const pathname = usePathname();
   const [updateCounts, setUpdateCounts] = useState<Record<string, number>>({});
 
@@ -49,12 +50,13 @@ export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
     return () => clearInterval(interval);
   }, []);
 
+  // On mobile, sidebar is always expanded (w-64) when shown via the overlay
   return (
     <motion.aside
       initial={false}
       animate={{ width: expanded ? 240 : 64 }}
       transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-      className="h-full border-r border-[var(--rule)] bg-[var(--bg)] flex flex-col shrink-0 overflow-hidden"
+      className="h-full border-r border-[var(--rule)] bg-[var(--bg)] flex flex-col shrink-0 overflow-hidden w-64 md:w-auto"
     >
       {/* Header */}
       <div className="flex items-center justify-between p-3 h-14">
@@ -84,7 +86,7 @@ export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
         )}
         <button
           onClick={toggle}
-          className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)] transition-colors duration-120"
+          className="hidden md:flex w-8 h-8 items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)] transition-colors duration-120"
           aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
         >
           {expanded ? (
@@ -157,6 +159,7 @@ export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
             <Link
               key={client.id}
               href={href}
+              onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-2 h-9 px-2 rounded-[var(--radius-sm)] text-sm transition-colors duration-120 ${
                 isActive
                   ? "bg-[var(--muted)] font-medium"
@@ -178,6 +181,16 @@ export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
 
       {/* Bottom nav */}
       <div className="p-3 border-t border-[var(--rule)] space-y-0.5">
+        {/* Finance */}
+        <SidebarLink
+          href="/finance"
+          icon={Wallet}
+          label="Finance"
+          expanded={expanded}
+          active={pathname.startsWith("/finance")}
+          onNavigate={() => setMobileOpen(false)}
+        />
+
         {/* Team Chat */}
         <SidebarLink
           href="/chat"
@@ -186,6 +199,7 @@ export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
           expanded={expanded}
           active={pathname === "/chat"}
           badge={updateCounts.chat}
+          onNavigate={() => setMobileOpen(false)}
         />
 
         {/* Completion — all roles */}
@@ -195,6 +209,7 @@ export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
           label="Completion"
           expanded={expanded}
           active={pathname === "/attendance"}
+          onNavigate={() => setMobileOpen(false)}
         />
 
         {/* Team — founders only */}
@@ -205,6 +220,7 @@ export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
             label="Team"
             expanded={expanded}
             active={pathname === "/team"}
+            onNavigate={() => setMobileOpen(false)}
           />
         )}
 
@@ -215,6 +231,7 @@ export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
           label="Settings"
           expanded={expanded}
           active={pathname === "/settings"}
+          onNavigate={() => setMobileOpen(false)}
         />
       </div>
     </motion.aside>
@@ -228,6 +245,7 @@ function SidebarLink({
   expanded,
   active,
   badge,
+  onNavigate,
 }: {
   href: string;
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
@@ -235,6 +253,7 @@ function SidebarLink({
   expanded: boolean;
   active: boolean;
   badge?: number;
+  onNavigate?: () => void;
 }) {
   if (!expanded) {
     return (
@@ -260,6 +279,7 @@ function SidebarLink({
   return (
     <Link
       href={href}
+      onClick={onNavigate}
       className={`flex items-center gap-2 h-9 px-2 rounded-[var(--radius-sm)] text-sm transition-colors duration-120 ${
         active
           ? "bg-[var(--muted)] font-medium"

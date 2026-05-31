@@ -445,6 +445,70 @@ export const deliverables = sqliteTable("deliverables", {
   updatedAt: text("updated_at").notNull(),
 });
 
+// --- Finance ---
+
+export const financeEntries = sqliteTable("finance_entries", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  date: text("date").notNull(),
+  type: text("type").notNull(), // income, expense
+  description: text("description").notNull(),
+  category: text("category"),
+  amount: real("amount").notNull(),
+  client: text("client"),
+  month: text("month").notNull(), // YYYY-MM
+  notes: text("notes"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const financeSettings = sqliteTable("finance_settings", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  currency: text("currency").notNull().default("INR"),
+  expectedMonthlyIncome: real("expected_monthly_income").default(0),
+  salaries: text("salaries"), // JSON array [{name, amount}]
+  recurringExpenses: text("recurring_expenses"), // JSON array [{name, amount}]
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const monthlyFixedCosts = sqliteTable("monthly_fixed_costs", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  month: text("month").notNull(), // YYYY-MM
+  salaries: text("salaries"), // JSON array
+  recurringExpenses: text("recurring_expenses"), // JSON array
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const financeConversations = sqliteTable("finance_conversations", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: text("title"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const financeMessages = sqliteTable("finance_messages", {
+  id: text("id").primaryKey(),
+  conversationId: text("conversation_id").notNull().references(() => financeConversations.id, { onDelete: "cascade" }),
+  role: text("role").notNull(), // user, assistant
+  content: text("content").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const forecasts = sqliteTable("forecasts", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  period: text("period"),
+  createdAt: text("created_at").notNull(),
+});
+
 // --- Team Tasks & Challenges ---
 
 export const challenges = sqliteTable("challenges", {
@@ -496,3 +560,9 @@ export type Note = typeof notes.$inferSelect;
 export type Deliverable = typeof deliverables.$inferSelect;
 export type InvoiceItem = typeof invoiceItems.$inferSelect;
 export type Challenge = typeof challenges.$inferSelect;
+export type FinanceEntry = typeof financeEntries.$inferSelect;
+export type FinanceSetting = typeof financeSettings.$inferSelect;
+export type MonthlyFixedCost = typeof monthlyFixedCosts.$inferSelect;
+export type FinanceConversation = typeof financeConversations.$inferSelect;
+export type FinanceMessage = typeof financeMessages.$inferSelect;
+export type Forecast = typeof forecasts.$inferSelect;

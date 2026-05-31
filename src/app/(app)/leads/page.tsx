@@ -176,12 +176,12 @@ export default function LeadsPage() {
   }, {} as Record<string, number>);
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       {/* Header */}
       <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-3">
-          <Compass className="w-6 h-6 text-[var(--ink-muted)]" strokeWidth={1.5} />
-          <h1 className="text-3xl font-serif font-semibold">Leads</h1>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Compass className="w-5 h-5 sm:w-6 sm:h-6 text-[var(--ink-muted)]" strokeWidth={1.5} />
+          <h1 className="text-2xl sm:text-3xl font-serif font-semibold">Leads</h1>
           <span className="text-sm text-[var(--ink-muted)]">({leads.length})</span>
         </div>
         <button
@@ -206,7 +206,7 @@ export default function LeadsPage() {
             </button>
           </div>
           <form onSubmit={handleCreate} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-[var(--ink-muted)] mb-1">Name <span className="text-[var(--accent-clay)]">*</span></label>
                 <input type="text" value={newLead.name} onChange={(e) => setNewLead({ ...newLead, name: e.target.value })} required placeholder="Contact name" className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
@@ -230,7 +230,7 @@ export default function LeadsPage() {
                   {SOURCE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
-              <div className="col-span-2">
+              <div className="sm:col-span-2">
                 <label className="block text-xs text-[var(--ink-muted)] mb-1">Notes</label>
                 <textarea value={newLead.notes} onChange={(e) => setNewLead({ ...newLead, notes: e.target.value })} rows={2} placeholder="Any notes about this lead..." className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent resize-none outline-none focus:border-[var(--accent-clay)]" />
               </div>
@@ -312,14 +312,14 @@ export default function LeadsPage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                     {lead.source && (
-                      <span className="flex items-center gap-1 text-xs text-[var(--ink-muted)]">
+                      <span className="hidden sm:flex items-center gap-1 text-xs text-[var(--ink-muted)]">
                         <Globe className="w-3 h-3" strokeWidth={1.5} />
                         {SOURCE_OPTIONS.find((o) => o.value === lead.source)?.label || lead.source}
                       </span>
                     )}
-                    <span className="text-xs text-[var(--ink-muted)]">{formatDate(lead.createdAt)}</span>
+                    <span className="hidden sm:inline text-xs text-[var(--ink-muted)]">{formatDate(lead.createdAt)}</span>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[lead.status] || ""}`}>
                       {STATUS_LABELS[lead.status] || lead.status}
                     </span>
@@ -337,12 +337,12 @@ export default function LeadsPage() {
                     {/* Status pipeline */}
                     <div className="mb-5">
                       <label className="block text-xs text-[var(--ink-muted)] mb-2">Pipeline stage</label>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 overflow-x-auto pb-1">
                         {STATUSES.map((s) => (
                           <button
                             key={s}
                             onClick={() => handleStatusChange(lead.id, s)}
-                            className={`flex-1 py-1.5 rounded-[var(--radius-sm)] text-xs font-medium text-center transition-colors ${
+                            className={`flex-1 min-w-[60px] py-1.5 rounded-[var(--radius-sm)] text-xs font-medium text-center transition-colors whitespace-nowrap ${
                               lead.status === s
                                 ? STATUS_COLORS[s]
                                 : "bg-[var(--muted)] text-[var(--ink-muted)] hover:bg-[var(--rule)]"
@@ -416,7 +416,7 @@ export default function LeadsPage() {
                     </div>
 
                     {/* Action buttons */}
-                    <div className="flex items-center gap-2 pt-2 border-t border-[var(--rule)]">
+                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[var(--rule)]">
                       <button
                         onClick={() => handleSave(lead.id)}
                         disabled={saving}
