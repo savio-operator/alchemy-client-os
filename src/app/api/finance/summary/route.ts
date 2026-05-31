@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { db, initPromise } from "@/db";
 import { financeEntries, financeSettings, monthlyFixedCosts } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
-import { eq, and } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -14,12 +13,8 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const year = searchParams.get("year") || new Date().getFullYear().toString();
 
-  // Get settings
-  const settings = await db
-    .select()
-    .from(financeSettings)
-    .where(eq(financeSettings.userId, user.id))
-    .get();
+  // Finance settings and data are shared across all founders
+  const settings = await db.select().from(financeSettings).get();
 
   const currency = settings?.currency || "INR";
   const expectedMonthlyIncome = settings?.expectedMonthlyIncome || 0;
@@ -27,21 +22,12 @@ export async function GET(request: Request) {
   const defaultRecurring = JSON.parse(settings?.recurringExpenses || "[]") as { name: string; amount: number }[];
   const defaultFixedCosts = defaultSalaries.reduce((s, x) => s + x.amount, 0) + defaultRecurring.reduce((s, x) => s + x.amount, 0);
 
-  // Get all entries for the year
-  const entries = await db
-    .select()
-    .from(financeEntries)
-    .where(eq(financeEntries.userId, user.id))
-    .all();
-
+  // All entries (not filtered by user)
+  const entries = await db.select().from(financeEntries).all();
   const yearEntries = entries.filter((e) => e.month.startsWith(year));
 
-  // Get monthly fixed cost overrides
-  const overrides = await db
-    .select()
-    .from(monthlyFixedCosts)
-    .where(eq(monthlyFixedCosts.userId, user.id))
-    .all();
+  // All monthly fixed cost overrides
+  const overrides = await db.select().from(monthlyFixedCosts).all();
 
   const overrideMap = new Map(
     overrides.map((o) => {
@@ -51,7 +37,6 @@ export async function GET(request: Request) {
     })
   );
 
-  // Build monthly summaries
   const months = Array.from({ length: 12 }, (_, i) => {
     const m = `${year}-${String(i + 1).padStart(2, "0")}`;
     const monthEntries = yearEntries.filter((e) => e.month === m);
@@ -61,7 +46,6 @@ export async function GET(request: Request) {
     return { month: m, income, expenses, fixedCosts, net: income - expenses - fixedCosts, entries: monthEntries.length };
   });
 
-  // Current month summary
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const current = months.find((m) => m.month === currentMonth);

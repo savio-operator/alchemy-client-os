@@ -12,11 +12,8 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await initPromise;
 
-  const row = await db
-    .select()
-    .from(financeSettings)
-    .where(eq(financeSettings.userId, user.id))
-    .get();
+  // Finance settings are shared — use the first (and only) row
+  const row = await db.select().from(financeSettings).get();
 
   if (!row) {
     return NextResponse.json({
@@ -42,11 +39,8 @@ export async function PUT(request: Request) {
   const body = await request.json();
   const now = new Date().toISOString();
 
-  const existing = await db
-    .select()
-    .from(financeSettings)
-    .where(eq(financeSettings.userId, user.id))
-    .get();
+  // Finance settings are shared — get the single row
+  const existing = await db.select().from(financeSettings).get();
 
   const data = {
     currency: body.currency || "INR",
@@ -57,7 +51,7 @@ export async function PUT(request: Request) {
   };
 
   if (existing) {
-    await db.update(financeSettings).set(data).where(eq(financeSettings.userId, user.id)).run();
+    await db.update(financeSettings).set(data).where(eq(financeSettings.id, existing.id)).run();
   } else {
     await db.insert(financeSettings).values({
       id: crypto.randomUUID(),

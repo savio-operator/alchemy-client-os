@@ -18,10 +18,10 @@ export async function POST(request: Request) {
     conversationId?: string;
   };
 
-  // Gather all financial data for context
-  const settings = await db.select().from(financeSettings).where(eq(financeSettings.userId, user.id)).get();
-  const entries = await db.select().from(financeEntries).where(eq(financeEntries.userId, user.id)).all();
-  const overrides = await db.select().from(monthlyFixedCosts).where(eq(monthlyFixedCosts.userId, user.id)).all();
+  // Gather all financial data for context (shared across founders)
+  const settings = await db.select().from(financeSettings).get();
+  const entries = await db.select().from(financeEntries).all();
+  const overrides = await db.select().from(monthlyFixedCosts).all();
 
   const currency = settings?.currency || "INR";
   const expectedIncome = settings?.expectedMonthlyIncome || 0;

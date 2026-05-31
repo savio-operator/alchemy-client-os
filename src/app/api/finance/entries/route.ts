@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db, initPromise } from "@/db";
 import { financeEntries } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -15,15 +15,10 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const month = searchParams.get("month");
 
-  const conditions = [eq(financeEntries.userId, user.id)];
-  if (month) conditions.push(eq(financeEntries.month, month));
-
-  const rows = await db
-    .select()
-    .from(financeEntries)
-    .where(and(...conditions))
-    .orderBy(desc(financeEntries.date))
-    .all();
+  // Finance data is shared across all founders
+  const rows = month
+    ? await db.select().from(financeEntries).where(eq(financeEntries.month, month)).orderBy(desc(financeEntries.date)).all()
+    : await db.select().from(financeEntries).orderBy(desc(financeEntries.date)).all();
 
   return NextResponse.json(rows);
 }
@@ -41,7 +36,6 @@ export async function POST(request: Request) {
   for (const entry of entries) {
     if (!entry.description || !entry.amount || !entry.date || !entry.type) continue;
 
-    // Derive month from date (YYYY-MM)
     const month = entry.month || entry.date.slice(0, 7);
 
     const record = {

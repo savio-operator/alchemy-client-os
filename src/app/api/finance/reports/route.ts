@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db, initPromise } from "@/db";
 import { financeEntries, financeSettings, monthlyFixedCosts } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import * as XLSX from "xlsx";
 
 export const dynamic = "force-dynamic";
@@ -15,23 +15,22 @@ export async function POST(request: Request) {
   const { month } = await request.json();
   if (!month) return NextResponse.json({ error: "month required" }, { status: 400 });
 
-  // Get data
+  // Get data (shared across all founders)
   const entries = await db
     .select()
     .from(financeEntries)
-    .where(and(eq(financeEntries.userId, user.id), eq(financeEntries.month, month)))
+    .where(eq(financeEntries.month, month))
     .all();
 
   const settings = await db
     .select()
     .from(financeSettings)
-    .where(eq(financeSettings.userId, user.id))
     .get();
 
   const override = await db
     .select()
     .from(monthlyFixedCosts)
-    .where(and(eq(monthlyFixedCosts.userId, user.id), eq(monthlyFixedCosts.month, month)))
+    .where(eq(monthlyFixedCosts.month, month))
     .get();
 
   const currency = settings?.currency || "INR";

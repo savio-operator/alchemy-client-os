@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db, initPromise } from "@/db";
 import { financeEntries } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -17,10 +17,11 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
+  // Any founder can edit any finance entry
   const existing = await db
     .select()
     .from(financeEntries)
-    .where(and(eq(financeEntries.id, id), eq(financeEntries.userId, user.id)))
+    .where(eq(financeEntries.id, id))
     .get();
 
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -46,10 +47,8 @@ export async function DELETE(
   await initPromise;
 
   const { id } = await params;
-  await db
-    .delete(financeEntries)
-    .where(and(eq(financeEntries.id, id), eq(financeEntries.userId, user.id)))
-    .run();
+  // Any founder can delete any finance entry
+  await db.delete(financeEntries).where(eq(financeEntries.id, id)).run();
 
   return NextResponse.json({ ok: true });
 }

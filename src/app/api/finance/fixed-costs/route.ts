@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db, initPromise } from "@/db";
 import { monthlyFixedCosts } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -16,10 +16,11 @@ export async function GET(request: Request) {
   const month = searchParams.get("month");
 
   if (month) {
+    // Shared data — find by month only
     const row = await db
       .select()
       .from(monthlyFixedCosts)
-      .where(and(eq(monthlyFixedCosts.userId, user.id), eq(monthlyFixedCosts.month, month)))
+      .where(eq(monthlyFixedCosts.month, month))
       .get();
 
     if (!row) return NextResponse.json(null);
@@ -30,11 +31,7 @@ export async function GET(request: Request) {
     });
   }
 
-  const rows = await db
-    .select()
-    .from(monthlyFixedCosts)
-    .where(eq(monthlyFixedCosts.userId, user.id))
-    .all();
+  const rows = await db.select().from(monthlyFixedCosts).all();
 
   return NextResponse.json(
     rows.map((r) => ({
@@ -55,10 +52,11 @@ export async function PUT(request: Request) {
   if (!month) return NextResponse.json({ error: "month required" }, { status: 400 });
 
   const now = new Date().toISOString();
+  // Shared data — find by month only
   const existing = await db
     .select()
     .from(monthlyFixedCosts)
-    .where(and(eq(monthlyFixedCosts.userId, user.id), eq(monthlyFixedCosts.month, month)))
+    .where(eq(monthlyFixedCosts.month, month))
     .get();
 
   const data = {
