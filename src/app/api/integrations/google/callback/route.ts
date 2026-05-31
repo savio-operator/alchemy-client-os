@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { exchangeGoogleCode, parseOAuthState } from "@/lib/integrations/google";
+import { logAudit } from "@/lib/audit";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
     // Extract userId from OAuth state for per-user token storage
     const { userId } = state ? parseOAuthState(state) : { userId: undefined };
     await exchangeGoogleCode(code, userId);
+    await logAudit({ action: "integration.connect", resource: "google", userId });
     return NextResponse.redirect(new URL("/settings?connected=google", appUrl));
   } catch (err) {
     const msg =

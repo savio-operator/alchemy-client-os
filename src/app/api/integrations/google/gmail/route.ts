@@ -1,8 +1,20 @@
 import { NextResponse } from "next/server";
 import { google } from "googleapis";
 import { getAuthedClient } from "@/lib/integrations/google";
+import { getCurrentUser } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
+import { validateEmailRecipients } from "@/lib/validators";
+import { logAudit } from "@/lib/audit";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const rl = rateLimit(`gmail:read:${user.id}`, { maxRequests: 30, windowMs: 60_000 });
+  if (!rl.success) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429, headers: { "Retry-After": "60" } });
+  }
+
   try {
     const auth = await getAuthedClient();
     const gmail = google.gmail({ version: "v1", auth });
@@ -49,12 +61,30 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Rate limit: 10 sends per minute
+  const rl = rateLimit(`gmail:send:${user.id}`, { maxRequests: 10, windowMs: 60_000 });
+  if (!rl.success) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429, headers: { "Retry-After": "60" } });
+  }
+
   try {
     const { to, subject, body } = await request.json();
 
     if (!to || !subject || !body) {
       return NextResponse.json(
         { error: "Missing required fields: to, subject, body" },
+        { status: 400 }
+      );
+    }
+
+    // Validate recipient email
+    const { valid, invalid } = validateEmailRecipients(to);
+    if (!valid) {
+      return NextResponse.json(
+        { error: `Invalid email address: ${invalid.join(", ")}` },
         { status: 400 }
       );
     }
@@ -81,6 +111,14 @@ export async function POST(request: Request) {
       requestBody: {
         raw: encodedMessage,
       },
+    });
+
+    // Audit log
+    await logAudit({
+      action: "gmail.send",
+      resource: "google/gmail",
+      detail: { to, subject },
+      userId: user.id,
     });
 
     return NextResponse.json({

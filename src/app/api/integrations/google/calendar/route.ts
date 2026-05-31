@@ -1,8 +1,20 @@
 import { NextResponse } from "next/server";
 import { google } from "googleapis";
 import { getAuthedClient } from "@/lib/integrations/google";
+import { getCurrentUser } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
+import { validateEmailRecipients } from "@/lib/validators";
+import { logAudit } from "@/lib/audit";
 
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const rl = rateLimit(`calendar:read:${user.id}`, { maxRequests: 30, windowMs: 60_000 });
+  if (!rl.success) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429, headers: { "Retry-After": "60" } });
+  }
+
   try {
     const auth = await getAuthedClient();
     const calendar = google.calendar({ version: "v3", auth });
@@ -44,6 +56,15 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Rate limit: 20 event creations per minute
+  const rl = rateLimit(`calendar:create:${user.id}`, { maxRequests: 20, windowMs: 60_000 });
+  if (!rl.success) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429, headers: { "Retry-After": "60" } });
+  }
+
   try {
     const { summary, start, end, description, attendees } =
       await request.json();
@@ -75,12 +96,28 @@ export async function POST(request: Request) {
     }
 
     if (attendees && Array.isArray(attendees)) {
-      eventBody.attendees = attendees.map((email: string) => ({ email }));
+      // Validate attendee emails
+      const { valid, invalid } = validateEmailRecipients(attendees);
+      if (!valid) {
+        return NextResponse.json(
+          { error: `Invalid attendee email(s): ${invalid.join(", ")}` },
+          { status: 400 }
+        );
+      }
+      eventBody.attendees = attendees.map((email: string) => ({ email: email.trim() }));
     }
 
     const res = await calendar.events.insert({
       calendarId: "primary",
       requestBody: eventBody,
+    });
+
+    // Audit log
+    await logAudit({
+      action: "calendar.create",
+      resource: "google/calendar",
+      detail: { summary, attendees: attendees || [] },
+      userId: user.id,
     });
 
     return NextResponse.json({

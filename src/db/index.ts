@@ -468,6 +468,24 @@ async function initTables() {
     );
   `);
 
+  // Audit log
+  await client.executeMultiple(`
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      action TEXT NOT NULL,
+      resource TEXT,
+      detail TEXT,
+      ip TEXT,
+      user_agent TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
+  `);
+
   // Challenges table
   await client.executeMultiple(`
     CREATE TABLE IF NOT EXISTS challenges (

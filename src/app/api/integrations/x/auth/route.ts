@@ -3,7 +3,7 @@ import { getXOAuthUrl } from "@/lib/integrations/x";
 
 export async function GET() {
   try {
-    const { url } = getXOAuthUrl();
+    const { url } = await getXOAuthUrl();
     return NextResponse.redirect(url);
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Failed to start OAuth";

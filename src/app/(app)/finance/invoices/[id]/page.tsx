@@ -611,14 +611,14 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ id: st
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <p className="text-xs font-medium text-[var(--ink-muted)]">Bank Transfer</p>
-              <input type="text" value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Bank name (e.g. HDFC Bank)" className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
-              <input type="text" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} placeholder="Account number" className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
-              <input type="text" value={bankIfsc} onChange={(e) => setBankIfsc(e.target.value)} placeholder="IFSC code" className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
-              <input type="text" value={bankBranch} onChange={(e) => setBankBranch(e.target.value)} placeholder="Branch (optional)" className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
+              <input type="text" value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Bank name (e.g. HDFC Bank)" autoComplete="off" className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
+              <input type="text" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} placeholder="Account number" autoComplete="off" className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
+              <input type="text" value={bankIfsc} onChange={(e) => setBankIfsc(e.target.value)} placeholder="IFSC code" autoComplete="off" className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
+              <input type="text" value={bankBranch} onChange={(e) => setBankBranch(e.target.value)} placeholder="Branch (optional)" autoComplete="off" className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
             </div>
             <div className="space-y-2">
               <p className="text-xs font-medium text-[var(--ink-muted)]">UPI</p>
-              <input type="text" value={upiId} onChange={(e) => setUpiId(e.target.value)} placeholder="UPI ID (e.g. name@upi)" className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
+              <input type="text" value={upiId} onChange={(e) => setUpiId(e.target.value)} placeholder="UPI ID (e.g. name@upi)" autoComplete="off" className="w-full text-sm border border-[var(--rule)] rounded-[var(--radius-sm)] px-2.5 py-1.5 bg-transparent outline-none focus:border-[var(--accent-clay)]" />
               <p className="text-xs text-[var(--ink-muted)]">Works with GPay, PhonePe, Paytm, and all UPI apps</p>
             </div>
           </div>

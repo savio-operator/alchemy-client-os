@@ -526,6 +526,19 @@ export const challenges = sqliteTable("challenges", {
   updatedAt: text("updated_at").notNull(),
 });
 
+// --- Audit ---
+
+export const auditLog = sqliteTable("audit_log", {
+  id: text("id").primaryKey(),
+  userId: text("user_id"),
+  action: text("action").notNull(),
+  resource: text("resource"),
+  detail: text("detail"), // JSON
+  ip: text("ip"),
+  userAgent: text("user_agent"),
+  createdAt: text("created_at").notNull(),
+});
+
 // --- Types ---
 
 export type User = typeof users.$inferSelect;

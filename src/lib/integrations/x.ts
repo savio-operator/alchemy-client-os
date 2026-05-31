@@ -1,9 +1,9 @@
 import { TwitterApi } from "twitter-api-v2";
 import { getIntegrationTokens, saveIntegrationTokens } from "@/lib/integration-store";
 import crypto from "crypto";
-
-// Store PKCE verifiers in memory (short-lived, used during OAuth flow)
-const pkceVerifiers = new Map<string, string>();
+import { db, initPromise } from "@/db";
+import { settings } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 async function getClient(): Promise<TwitterApi> {
   const tokens = await getIntegrationTokens("x");
@@ -11,9 +11,11 @@ async function getClient(): Promise<TwitterApi> {
   return new TwitterApi(tokens.accessToken);
 }
 
-export function getXOAuthUrl(): { url: string; state: string } {
+export async function getXOAuthUrl(): Promise<{ url: string; state: string }> {
   const clientId = process.env.X_CLIENT_ID;
   if (!clientId) throw new Error("X_CLIENT_ID not configured");
+
+  await initPromise;
 
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/integrations/x/callback`;
   const state = crypto.randomBytes(16).toString("hex");
@@ -25,10 +27,16 @@ export function getXOAuthUrl(): { url: string; state: string } {
     .update(codeVerifier)
     .digest("base64url");
 
-  pkceVerifiers.set(state, codeVerifier);
+  // Store verifier in DB with expiry (10 min)
+  const key = `pkce:x:${state}`;
+  const value = JSON.stringify({ verifier: codeVerifier, expiresAt: Date.now() + 10 * 60 * 1000 });
 
-  // Clean up verifiers after 10 minutes
-  setTimeout(() => pkceVerifiers.delete(state), 10 * 60 * 1000);
+  const existing = await db.select().from(settings).where(eq(settings.key, key)).get();
+  if (existing) {
+    await db.update(settings).set({ value }).where(eq(settings.key, key)).run();
+  } else {
+    await db.insert(settings).values({ key, value }).run();
+  }
 
   const scope = "tweet.read tweet.write users.read offline.access";
   const url = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
@@ -41,16 +49,28 @@ export async function exchangeXCode(code: string, state: string): Promise<void> 
   const clientSecret = process.env.X_CLIENT_SECRET;
   if (!clientId || !clientSecret) throw new Error("X credentials not configured");
 
-  const codeVerifier = pkceVerifiers.get(state);
-  if (!codeVerifier) throw new Error("Invalid or expired OAuth state");
-  pkceVerifiers.delete(state);
+  await initPromise;
+
+  // Retrieve PKCE verifier from DB
+  const key = `pkce:x:${state}`;
+  const row = await db.select().from(settings).where(eq(settings.key, key)).get();
+  if (!row) throw new Error("Invalid or expired OAuth state");
+
+  const { verifier, expiresAt } = JSON.parse(row.value);
+  if (Date.now() > expiresAt) {
+    await db.delete(settings).where(eq(settings.key, key)).run();
+    throw new Error("OAuth state expired");
+  }
+
+  // Clean up
+  await db.delete(settings).where(eq(settings.key, key)).run();
 
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/integrations/x/callback`;
 
   const client = new TwitterApi({ clientId, clientSecret });
   const { accessToken, refreshToken, expiresIn } = await client.loginWithOAuth2({
     code,
-    codeVerifier,
+    codeVerifier: verifier,
     redirectUri,
   });
 
