@@ -181,15 +181,17 @@ export function Sidebar({ clients, userRole, onNewClient }: SidebarProps) {
 
       {/* Bottom nav */}
       <div className="p-3 border-t border-[var(--rule)] space-y-0.5">
-        {/* Finance */}
-        <SidebarLink
-          href="/finance"
-          icon={Wallet}
-          label="Finance"
-          expanded={expanded}
-          active={pathname.startsWith("/finance")}
-          onNavigate={() => setMobileOpen(false)}
-        />
+        {/* Finance — founders only */}
+        {isFounder && (
+          <SidebarLink
+            href="/finance"
+            icon={Wallet}
+            label="Finance"
+            expanded={expanded}
+            active={pathname.startsWith("/finance")}
+            onNavigate={() => setMobileOpen(false)}
+          />
+        )}
 
         {/* Team Chat */}
         <SidebarLink

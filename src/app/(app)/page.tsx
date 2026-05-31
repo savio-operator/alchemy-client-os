@@ -111,10 +111,10 @@ export default async function HomePage() {
             href: "/tasks",
           },
           {
-            label: "Pending invoices",
+            label: "Finance",
             value: pendingInvoices?.[0]?.value ?? 0,
             icon: Receipt,
-            href: "/finance/invoices",
+            href: "/finance",
           },
           {
             label: "New leads",
