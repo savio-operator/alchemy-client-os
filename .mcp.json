@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "adchemy-client-os": {
+      "url": "https://adchemy-client-os.onrender.com/api/mcp"
+    }
+  }
+}
