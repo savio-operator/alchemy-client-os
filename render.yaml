@@ -20,3 +20,5 @@ services:
         generateValue: true
       - key: DB_PATH
         value: /data/adchemy.db
+      - key: MCP_ADMIN_TOKEN
+        sync: false
