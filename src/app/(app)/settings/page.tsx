@@ -40,8 +40,8 @@ const PROVIDER_INFO: Record<string, { label: string; description: string }> = {
     description: "Marketing API for company page posts",
   },
   google: {
-    label: "Google Analytics + Search Console",
-    description: "Read-only analytics data to auto-fill campaign outcomes",
+    label: "Google (Gmail, Analytics, Search Console, Calendar)",
+    description: "Send invoices from Gmail, plus read-only Analytics/Search Console and Calendar access. Reconnect if you connected before invoice email was added.",
   },
   razorpay: {
     label: "Razorpay",
