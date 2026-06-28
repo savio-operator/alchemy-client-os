@@ -28,11 +28,37 @@ export async function GET(
   const encoder = new TextEncoder();
   let lastSeen = new Date().toISOString();
   let alive = true;
+  let keepalive: ReturnType<typeof setInterval> | null = null;
+  let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Single place to tear everything down so no timer outlives the connection.
+  const cleanup = () => {
+    if (!alive) return;
+    alive = false;
+    if (keepalive) clearInterval(keepalive);
+    if (pollTimer) clearTimeout(pollTimer);
+  };
+
+  // The browser/proxy often drops a backgrounded SSE connection WITHOUT calling
+  // the stream's cancel(), so abort is our reliable disconnect signal.
+  request.signal.addEventListener("abort", cleanup);
 
   const stream = new ReadableStream({
     async start(controller) {
+      // Writing to a closed/cancelled controller throws — that's our cue that
+      // the client is gone, so always tear down rather than swallowing it.
+      const safeEnqueue = (chunk: string): boolean => {
+        try {
+          controller.enqueue(encoder.encode(chunk));
+          return true;
+        } catch {
+          cleanup();
+          return false;
+        }
+      };
+
       // Send initial keepalive
-      controller.enqueue(encoder.encode(": keepalive\n\n"));
+      if (!safeEnqueue(": keepalive\n\n")) return;
 
       const poll = async () => {
         if (!alive) return;
@@ -47,29 +73,29 @@ export async function GET(
           for (const msg of newMsgs) {
             const u = await db.select().from(users).where(eq(users.id, msg.userId)).get();
             const data = JSON.stringify({ ...msg, userName: u?.name || "Unknown", userRole: u?.role || "member" });
-            controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+            if (!safeEnqueue(`data: ${data}\n\n`)) return; // client gone — stop polling
             if (msg.createdAt > lastSeen) lastSeen = msg.createdAt;
           }
         } catch {
-          // DB error — skip this poll cycle
+          // DB error — skip this poll cycle, but keep the loop alive
         }
 
         if (alive) {
-          setTimeout(poll, 3000);
+          pollTimer = setTimeout(poll, 3000);
         }
       };
 
       // Start polling after initial delay
-      setTimeout(poll, 3000);
+      pollTimer = setTimeout(poll, 3000);
 
       // Send keepalive every 15s to prevent connection timeout
-      const keepalive = setInterval(() => {
-        if (!alive) { clearInterval(keepalive); return; }
-        try { controller.enqueue(encoder.encode(": keepalive\n\n")); } catch { clearInterval(keepalive); }
+      keepalive = setInterval(() => {
+        if (!alive) { if (keepalive) clearInterval(keepalive); return; }
+        safeEnqueue(": keepalive\n\n");
       }, 15000);
     },
     cancel() {
-      alive = false;
+      cleanup();
     },
   });
 

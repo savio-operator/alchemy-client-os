@@ -98,9 +98,22 @@ export default function InvoicePreviewPage({ params }: { params: Promise<{ id: s
     <>
       <style>{`
         @media print {
+          /* Hide all app chrome (sidebar, top bar, drawers) and show only the invoice */
+          body * { visibility: hidden !important; }
+          .print-page, .print-page * { visibility: visible !important; }
           .no-print { display: none !important; }
           body { background: white !important; }
-          .print-page { box-shadow: none !important; margin: 0 !important; padding: 40px !important; max-width: none !important; }
+          .print-page {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: none !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            padding: 40px !important;
+          }
         }
       `}</style>
 

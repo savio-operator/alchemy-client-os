@@ -22,3 +22,5 @@ services:
         value: /data/adchemy.db
       - key: MCP_ADMIN_TOKEN
         sync: false
+      - key: GMAIL_FROM_NAME
+        sync: false

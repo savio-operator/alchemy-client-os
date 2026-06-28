@@ -3,7 +3,8 @@ import { db, initPromise } from "@/db";
 import { invoices, invoiceItems, clients, settings } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { eq } from "drizzle-orm";
-import { Resend } from "resend";
+import { google } from "googleapis";
+import { getAuthedClient } from "@/lib/integrations/google";
 
 export const dynamic = "force-dynamic";
 
@@ -32,11 +33,6 @@ export async function POST(
     return NextResponse.json({ error: "Valid email address is required" }, { status: 400 });
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: "RESEND_API_KEY is not configured" }, { status: 503 });
-  }
-
   // Fetch invoice data
   const invoice = await db.select().from(invoices).where(eq(invoices.id, id)).get();
   if (!invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
@@ -44,8 +40,9 @@ export async function POST(
   const items = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id)).all();
   const client = await db.select().from(clients).where(eq(clients.id, invoice.clientId)).get();
 
-  // Get business info
-  const fromEmail = process.env.RESEND_FROM_EMAIL || "invoices@resend.dev";
+  // Emails are sent through the connected Google account (Gmail API), so the
+  // sender address is always that account. We only control the display name.
+  const fromName = process.env.GMAIL_FROM_NAME || invoice.fromName || "Adchemy";
 
   const subtotal = items.reduce((sum, i) => sum + i.quantity * i.rate, 0);
   const taxAmount = subtotal * ((invoice.taxPercent || 0) / 100);
@@ -141,19 +138,54 @@ export async function POST(
 </body>
 </html>`;
 
-  // Send email
-  const resend = new Resend(apiKey);
+  // Send via the connected Google account using the Gmail API (OAuth — no
+  // app password needed). The account is connected once under Settings →
+  // Integrations → Connect Google (authorize as the official Adchemy address).
+  let auth;
   try {
-    const { error } = await resend.emails.send({
-      from: fromEmail,
-      to: [to],
-      subject: subject || `Invoice ${invoice.number} from ${invoice.fromName || "Adchemy"}`,
-      html,
-    });
+    auth = await getAuthedClient(user.id);
+  } catch {
+    return NextResponse.json(
+      {
+        error:
+          "Google account is not connected. Go to Settings → Integrations and connect the official Adchemy Google account to send invoices.",
+      },
+      { status: 503 }
+    );
+  }
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+  try {
+    const gmail = google.gmail({ version: "v1", auth });
+
+    // Resolve the connected account's address so we can set a friendly From.
+    const profile = await gmail.users.getProfile({ userId: "me" });
+    const fromEmail = profile.data.emailAddress || "me";
+    const finalSubject =
+      subject || `Invoice ${invoice.number} from ${invoice.fromName || "Adchemy"}`;
+
+    // RFC 2047 encode the subject so non-ASCII characters survive.
+    const encodedSubject = `=?UTF-8?B?${Buffer.from(finalSubject).toString("base64")}?=`;
+
+    const rawMessage = [
+      `From: "${fromName}" <${fromEmail}>`,
+      `To: ${to}`,
+      `Subject: ${encodedSubject}`,
+      "MIME-Version: 1.0",
+      "Content-Type: text/html; charset=utf-8",
+      "",
+      html,
+    ].join("\r\n");
+
+    const encodedMessage = Buffer.from(rawMessage)
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+    await gmail.users.messages.send({
+      userId: "me",
+      requestBody: { raw: encodedMessage },
+    });
 
     // Update invoice status to sent if it's draft
     if (invoice.status === "draft") {
@@ -166,7 +198,12 @@ export async function POST(
 
     return NextResponse.json({ success: true, status: "sent" });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to send email";
+    let message = err instanceof Error ? err.message : "Failed to send email";
+    // A revoked/expired Google grant surfaces as an invalid_grant auth error.
+    if (/invalid_grant|invalid credentials|unauthorized|insufficient/i.test(message)) {
+      message =
+        "Google authorization failed or expired. Reconnect the official Adchemy Google account under Settings → Integrations (ensure Gmail send access is granted).";
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
