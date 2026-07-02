@@ -730,8 +730,17 @@ async function handleMCP(request: Request): Promise<Response> {
   return response;
 }
 
-export async function GET(request: Request) {
-  return handleMCP(request);
+export async function GET() {
+  // This server is stateless (no sessions, no server-initiated messages).
+  // Per the MCP spec, GET opens a standalone SSE stream — passing it to the
+  // transport makes the response hang with no headers, which mcp-remote
+  // treats as a fatal error and drops the whole session ("disconnected"
+  // right after a successful connect). Answer 405 so clients skip the
+  // standalone stream and keep the POST channel alive.
+  return new Response(null, {
+    status: 405,
+    headers: { Allow: "POST, DELETE" },
+  });
 }
 
 export async function POST(request: Request) {
