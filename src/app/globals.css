@@ -84,12 +84,12 @@
   --theme-accent: hsl(var(--tint-h) calc(var(--tint-s) * 0.9%) 34%);
   --link: #1264a3;
 
-  /* Tinted light content area — subtle wash of the theme color */
-  --bg: hsl(var(--tint-h) calc(var(--tint-s) * 0.32%) 97.2%);
-  --surface: hsl(var(--tint-h) calc(var(--tint-s) * 0.3%) 99.2%);
-  --ink: hsl(var(--tint-h) calc(var(--tint-s) * 0.35%) 13%);
-  --ink-muted: hsl(var(--tint-h) calc(var(--tint-s) * 0.16%) 40%);
-  --rule: hsl(var(--tint-h) calc(var(--tint-s) * 0.4%) 25% / 0.14);
+  /* Tinted light content area — clear wash of the theme color */
+  --bg: hsl(var(--tint-h) calc(var(--tint-s) * 0.55%) 95.5%);
+  --surface: hsl(var(--tint-h) calc(var(--tint-s) * 0.5%) 98.5%);
+  --ink: hsl(var(--tint-h) calc(var(--tint-s) * 0.4%) 12%);
+  --ink-muted: hsl(var(--tint-h) calc(var(--tint-s) * 0.22%) 38%);
+  --rule: hsl(var(--tint-h) calc(var(--tint-s) * 0.5%) 30% / 0.16);
 
   /* Legacy alias — most pages reference --accent-clay; keep it pointed at the theme accent */
   --accent-clay: var(--theme-accent);
@@ -103,9 +103,9 @@
   --popover-foreground: var(--ink);
   --primary: var(--ink);
   --primary-foreground: var(--bg);
-  --secondary: hsl(var(--tint-h) calc(var(--tint-s) * 0.3%) 93.5%);
+  --secondary: hsl(var(--tint-h) calc(var(--tint-s) * 0.5%) 91%);
   --secondary-foreground: var(--ink);
-  --muted: hsl(var(--tint-h) calc(var(--tint-s) * 0.3%) 93.5%);
+  --muted: hsl(var(--tint-h) calc(var(--tint-s) * 0.5%) 91%);
   --muted-foreground: var(--ink-muted);
   --accent: var(--theme-accent);
   --accent-foreground: #ffffff;
@@ -135,14 +135,14 @@
 
 /* Dark content area (frame stays themed) — same tint, dark lightness */
 .dark {
-  --bg: hsl(var(--tint-h) calc(var(--tint-s) * 0.28%) 10%);
-  --surface: hsl(var(--tint-h) calc(var(--tint-s) * 0.26%) 13.5%);
-  --ink: hsl(var(--tint-h) calc(var(--tint-s) * 0.12%) 85%);
-  --ink-muted: hsl(var(--tint-h) calc(var(--tint-s) * 0.08%) 62%);
-  --rule: hsl(var(--tint-h) calc(var(--tint-s) * 0.25%) 85% / 0.11);
+  --bg: hsl(var(--tint-h) calc(var(--tint-s) * 0.5%) 12.5%);
+  --surface: hsl(var(--tint-h) calc(var(--tint-s) * 0.48%) 16.5%);
+  --ink: hsl(var(--tint-h) calc(var(--tint-s) * 0.15%) 88%);
+  --ink-muted: hsl(var(--tint-h) calc(var(--tint-s) * 0.14%) 64%);
+  --rule: hsl(var(--tint-h) calc(var(--tint-s) * 0.4%) 80% / 0.14);
 
   /* Brighter accent for dark surfaces */
-  --theme-accent: hsl(var(--tint-h) calc(var(--tint-s) * 0.75%) 52%);
+  --theme-accent: hsl(var(--tint-h) calc(var(--tint-s) * 0.8%) 56%);
 
   --background: var(--bg);
   --foreground: var(--ink);
@@ -152,9 +152,9 @@
   --popover-foreground: var(--ink);
   --primary: var(--ink);
   --primary-foreground: var(--bg);
-  --secondary: hsl(var(--tint-h) calc(var(--tint-s) * 0.24%) 17.5%);
+  --secondary: hsl(var(--tint-h) calc(var(--tint-s) * 0.45%) 21%);
   --secondary-foreground: var(--ink);
-  --muted: hsl(var(--tint-h) calc(var(--tint-s) * 0.24%) 17.5%);
+  --muted: hsl(var(--tint-h) calc(var(--tint-s) * 0.45%) 21%);
   --muted-foreground: var(--ink-muted);
   --accent: var(--theme-accent);
   --accent-foreground: #ffffff;

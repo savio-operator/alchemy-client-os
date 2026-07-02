@@ -100,10 +100,10 @@ export function deriveFramePalette(hex: string): FramePalette | null {
       ? "rgba(255, 255, 255, 0.30)"
       : "rgba(255, 255, 255, 0.22)",
     "--frame-border": "rgba(255, 255, 255, 0.13)",
-    // Grayscale picks (s≈0) keep a whisper of saturation so calc() math
-    // still produces neutral-looking surfaces rather than pure gray-on-gray.
+    // Floor the saturation so muted picks (slate, gray-blue) still produce
+    // a clearly visible wash in the content area — the point of the theme.
     "--tint-h": String(Math.round(hsl.h)),
-    "--tint-s": String(Math.round(clamp(hsl.s, 4, 100))),
+    "--tint-s": String(Math.round(clamp(hsl.s, 30, 100))),
   };
 }
 
