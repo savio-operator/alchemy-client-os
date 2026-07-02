@@ -227,7 +227,7 @@ export default function SocialPage() {
                         >
                           <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${
                             post.status === "posted" ? "bg-green-500" :
-                            post.status === "queued" ? "bg-blue-500" : "bg-gray-400"
+                            post.status === "queued" ? "bg-blue-500" : "bg-[var(--ink-muted)]"
                           }`} />
                           {post.platform}
                         </button>

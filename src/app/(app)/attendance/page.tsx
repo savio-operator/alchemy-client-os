@@ -40,7 +40,7 @@ const priorityStyles: Record<string, { bg: string; text: string; label: string }
   urgent: { bg: "bg-red-100 dark:bg-red-950", text: "text-red-700 dark:text-red-300", label: "Urgent" },
   high: { bg: "bg-orange-100 dark:bg-orange-950", text: "text-orange-700 dark:text-orange-300", label: "High" },
   medium: { bg: "bg-yellow-100 dark:bg-yellow-950", text: "text-yellow-700 dark:text-yellow-300", label: "Medium" },
-  low: { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-600 dark:text-gray-400", label: "Low" },
+  low: { bg: "bg-[var(--muted)]", text: "text-[var(--ink-muted)]", label: "Low" },
 };
 
 export default function CompletionPage() {

@@ -57,9 +57,18 @@
   --radius: 8px;
 
   /*
+   * Theme tint: hue + saturation of the user's chosen workspace color.
+   * Set at runtime by the theme engine; defaults = Slack aubergine (#3F0E40).
+   * Every content token below derives from these two numbers, so the whole
+   * OS — pages, cards, borders, accents — carries the chosen color in both
+   * light and dark mode.
+   */
+  --tint-h: 299;
+  --tint-s: 64;
+
+  /*
    * Slack-style frame (workspace chrome: rail, sidebar, top bar).
-   * These are overridden at runtime by the ThemeProvider when the user
-   * picks a custom frame color. Defaults = Slack aubergine.
+   * Overridden at runtime when the user picks a custom frame color.
    */
   --frame: #3f0e40;
   --frame-dark: #350d36;
@@ -71,16 +80,16 @@
   --frame-border: rgba(255, 255, 255, 0.13);
   --presence: #2bac76;
 
-  /* Theme accent (buttons, links, highlights inside content). Follows frame color. */
-  --theme-accent: #611f69;
+  /* Theme accent (buttons, links, highlights inside content). Follows the tint. */
+  --theme-accent: hsl(var(--tint-h) calc(var(--tint-s) * 0.9%) 34%);
   --link: #1264a3;
 
-  /* Slack-style light content area */
-  --bg: #ffffff;
-  --surface: #ffffff;
-  --ink: #1d1c1d;
-  --ink-muted: #616061;
-  --rule: rgba(29, 28, 29, 0.13);
+  /* Tinted light content area — subtle wash of the theme color */
+  --bg: hsl(var(--tint-h) calc(var(--tint-s) * 0.32%) 97.2%);
+  --surface: hsl(var(--tint-h) calc(var(--tint-s) * 0.3%) 99.2%);
+  --ink: hsl(var(--tint-h) calc(var(--tint-s) * 0.35%) 13%);
+  --ink-muted: hsl(var(--tint-h) calc(var(--tint-s) * 0.16%) 40%);
+  --rule: hsl(var(--tint-h) calc(var(--tint-s) * 0.4%) 25% / 0.14);
 
   /* Legacy alias — most pages reference --accent-clay; keep it pointed at the theme accent */
   --accent-clay: var(--theme-accent);
@@ -94,9 +103,9 @@
   --popover-foreground: var(--ink);
   --primary: var(--ink);
   --primary-foreground: var(--bg);
-  --secondary: #f8f8f8;
+  --secondary: hsl(var(--tint-h) calc(var(--tint-s) * 0.3%) 93.5%);
   --secondary-foreground: var(--ink);
-  --muted: #f8f8f8;
+  --muted: hsl(var(--tint-h) calc(var(--tint-s) * 0.3%) 93.5%);
   --muted-foreground: var(--ink-muted);
   --accent: var(--theme-accent);
   --accent-foreground: #ffffff;
@@ -124,13 +133,16 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.08);
 }
 
-/* Dark content area (frame stays themed) — Slack dark mode */
+/* Dark content area (frame stays themed) — same tint, dark lightness */
 .dark {
-  --bg: #1a1d21;
-  --surface: #222529;
-  --ink: #d1d2d3;
-  --ink-muted: #9a9b9e;
-  --rule: rgba(232, 232, 232, 0.11);
+  --bg: hsl(var(--tint-h) calc(var(--tint-s) * 0.28%) 10%);
+  --surface: hsl(var(--tint-h) calc(var(--tint-s) * 0.26%) 13.5%);
+  --ink: hsl(var(--tint-h) calc(var(--tint-s) * 0.12%) 85%);
+  --ink-muted: hsl(var(--tint-h) calc(var(--tint-s) * 0.08%) 62%);
+  --rule: hsl(var(--tint-h) calc(var(--tint-s) * 0.25%) 85% / 0.11);
+
+  /* Brighter accent for dark surfaces */
+  --theme-accent: hsl(var(--tint-h) calc(var(--tint-s) * 0.75%) 52%);
 
   --background: var(--bg);
   --foreground: var(--ink);
@@ -140,9 +152,9 @@
   --popover-foreground: var(--ink);
   --primary: var(--ink);
   --primary-foreground: var(--bg);
-  --secondary: #27292d;
+  --secondary: hsl(var(--tint-h) calc(var(--tint-s) * 0.24%) 17.5%);
   --secondary-foreground: var(--ink);
-  --muted: #27292d;
+  --muted: hsl(var(--tint-h) calc(var(--tint-s) * 0.24%) 17.5%);
   --muted-foreground: var(--ink-muted);
   --accent: var(--theme-accent);
   --accent-foreground: #ffffff;

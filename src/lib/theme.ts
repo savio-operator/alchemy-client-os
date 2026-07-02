@@ -8,7 +8,9 @@
 export const DEFAULT_FRAME = "#3F0E40"; // Slack aubergine
 
 export const THEME_STORAGE_KEY = "adchemy-frame";
-export const THEME_VARS_KEY = "adchemy-frame-vars";
+// v2: palettes now carry tint hue/saturation for content-area tinting
+// instead of a fixed --theme-accent. Old cached v1 JSON is simply ignored.
+export const THEME_VARS_KEY = "adchemy-frame-vars-v2";
 
 export const THEME_PRESETS: { name: string; hex: string }[] = [
   { name: "Aubergine", hex: "#3F0E40" },
@@ -69,7 +71,10 @@ export interface FramePalette {
   "--frame-hover": string;
   "--frame-active": string;
   "--frame-border": string;
-  "--theme-accent": string;
+  /* Tint hue/saturation — globals.css derives all content-area tokens
+     (bg, cards, borders, text, accent) from these, per light/dark mode. */
+  "--tint-h": string;
+  "--tint-s": string;
 }
 
 /** Derive the full frame palette from a single base hex. */
@@ -84,13 +89,6 @@ export function deriveFramePalette(hex: string): FramePalette | null {
   const frameDark: HSL = { ...frame, l: clamp(frame.l - 4, 5, 100) };
   const frameDarker: HSL = { ...frame, l: clamp(frame.l - 8, 3, 100) };
 
-  // Content-area accent: same hue, tuned for white text on buttons.
-  const accent: HSL = {
-    h: hsl.h,
-    s: clamp(hsl.s, 25, 75),
-    l: clamp(hsl.l, 28, 42),
-  };
-
   return {
     "--frame": hslCss(frame),
     "--frame-dark": hslCss(frameDark),
@@ -102,7 +100,10 @@ export function deriveFramePalette(hex: string): FramePalette | null {
       ? "rgba(255, 255, 255, 0.30)"
       : "rgba(255, 255, 255, 0.22)",
     "--frame-border": "rgba(255, 255, 255, 0.13)",
-    "--theme-accent": hslCss(accent),
+    // Grayscale picks (s≈0) keep a whisper of saturation so calc() math
+    // still produces neutral-looking surfaces rather than pure gray-on-gray.
+    "--tint-h": String(Math.round(hsl.h)),
+    "--tint-s": String(Math.round(clamp(hsl.s, 4, 100))),
   };
 }
 
@@ -124,7 +125,8 @@ export function clearFramePalette(): void {
     "--frame-hover",
     "--frame-active",
     "--frame-border",
-    "--theme-accent",
+    "--tint-h",
+    "--tint-s",
   ];
   for (const key of keys) root.style.removeProperty(key);
 }
