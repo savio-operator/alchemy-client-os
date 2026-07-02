@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, Suspense, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Sidebar } from "@/components/sidebar";
+import { WorkspaceRail } from "@/components/workspace-rail";
+import { WorkspaceSidebar } from "@/components/workspace-sidebar";
 import { TopBar } from "@/components/top-bar";
 import { AgentDrawer } from "@/components/agent-drawer";
 import { CommandPalette } from "@/components/command-palette";
@@ -48,37 +49,55 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [user]);
 
   const breadcrumbs = buildBreadcrumbs(pathname, clients);
+  const isFounder = user?.role === "founder";
+
+  const sidebar = (
+    <Suspense fallback={<div className="w-[256px] shrink-0 bg-[var(--frame)]" />}>
+      <WorkspaceSidebar
+        clients={clients}
+        isFounder={isFounder}
+        onNewClient={() => {
+          setShowOnboarding(true);
+          setMobileOpen(false);
+        }}
+        onNavigate={() => setMobileOpen(false)}
+      />
+    </Suspense>
+  );
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Mobile sidebar overlay */}
-      {mobileOpen && (
+    <div className="flex flex-col h-screen overflow-hidden bg-[var(--frame-dark)]">
+      <TopBar breadcrumbs={breadcrumbs} userName={user?.name} />
+
+      <div className="flex flex-1 min-h-0">
+        {/* Mobile overlay */}
+        {mobileOpen && (
+          <div
+            className="fixed inset-0 bg-black/40 z-40 md:hidden"
+            onClick={() => setMobileOpen(false)}
+          />
+        )}
+
+        {/* Rail + contextual sidebar — overlay drawer on mobile */}
         <div
-          className="fixed inset-0 bg-black/40 z-40 md:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
+          className={`
+            fixed inset-y-0 left-0 z-50 flex md:relative md:z-auto md:inset-auto
+            bg-[var(--frame-dark)]
+            transform transition-transform duration-200 ease-in-out
+            ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
+            md:translate-x-0
+          `}
+        >
+          <WorkspaceRail
+            isFounder={isFounder}
+            clients={clients}
+            userName={user?.name}
+          />
+          {sidebar}
+        </div>
 
-      {/* Sidebar — hidden on mobile, shown as overlay when mobileOpen */}
-      <div
-        className={`
-          fixed inset-y-0 left-0 z-50 md:relative md:z-auto
-          transform transition-transform duration-200 ease-in-out
-          ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
-          md:translate-x-0
-        `}
-      >
-        <Sidebar
-          clients={clients}
-          userRole={user?.role || "member"}
-          onNewClient={() => { setShowOnboarding(true); setMobileOpen(false); }}
-        />
-      </div>
-
-      <div className="flex-1 flex flex-col min-w-0">
-        <TopBar breadcrumbs={breadcrumbs} userName={user?.name} />
-
-        <main className="flex-1 overflow-y-auto">
+        {/* Content panel — the light rounded surface inside the frame */}
+        <main className="flex-1 min-w-0 overflow-y-auto bg-[var(--bg)] md:rounded-tl-lg border-t border-l border-[var(--rule)]/40">
           <div className="animate-panel-in">{children}</div>
         </main>
       </div>
@@ -151,6 +170,14 @@ function buildBreadcrumbs(
 
   if (segments[0] === "tasks") {
     return [{ label: "Tasks" }];
+  }
+
+  if (segments[0] === "news") {
+    return [{ label: "Industry News" }];
+  }
+
+  if (segments[0] === "finance") {
+    return [{ label: "Finance" }];
   }
 
   if (segments[0] === "team") {

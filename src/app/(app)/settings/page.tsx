@@ -19,6 +19,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ThemeColorPicker } from "@/components/theme-color-picker";
 import { useUser } from "@/store/user";
 
 interface Integration {
@@ -269,6 +270,9 @@ export default function SettingsPage() {
             <Button variant="outline" size="sm" onClick={toggleDark}>
               Switch to {dark ? "light" : "dark"}
             </Button>
+          </div>
+          <div className="mt-5 pt-5 border-t border-[var(--rule)]">
+            <ThemeColorPicker />
           </div>
         </div>
       </section>

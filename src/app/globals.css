@@ -8,9 +8,11 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
-  --font-serif: var(--font-source-serif);
+  /* Slack look: headings are bold sans — the serif token now resolves to Inter
+     so the 29 pages using `font-serif` adopt the new style without edits. */
+  --font-serif: var(--font-inter);
   --font-mono: var(--font-jetbrains-mono);
-  --font-heading: var(--font-source-serif);
+  --font-heading: var(--font-inter);
 
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -43,8 +45,8 @@
   --color-card: var(--card);
 
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
   --radius-xl: 16px;
   --radius-2xl: 16px;
   --radius-3xl: 16px;
@@ -52,15 +54,36 @@
 }
 
 :root {
-  --radius: 10px;
+  --radius: 8px;
 
-  /* Adchemy palette */
-  --bg: #FAFAF7;
-  --surface: #FFFFFF;
-  --ink: #1A1916;
-  --ink-muted: #6B6760;
-  --accent-clay: #C96442;
-  --rule: rgba(26, 25, 22, 0.08);
+  /*
+   * Slack-style frame (workspace chrome: rail, sidebar, top bar).
+   * These are overridden at runtime by the ThemeProvider when the user
+   * picks a custom frame color. Defaults = Slack aubergine.
+   */
+  --frame: #3f0e40;
+  --frame-dark: #350d36;
+  --frame-darker: #2c0b2d;
+  --frame-text: rgba(255, 255, 255, 0.88);
+  --frame-text-dim: rgba(255, 255, 255, 0.62);
+  --frame-hover: rgba(255, 255, 255, 0.1);
+  --frame-active: rgba(255, 255, 255, 0.22);
+  --frame-border: rgba(255, 255, 255, 0.13);
+  --presence: #2bac76;
+
+  /* Theme accent (buttons, links, highlights inside content). Follows frame color. */
+  --theme-accent: #611f69;
+  --link: #1264a3;
+
+  /* Slack-style light content area */
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --ink: #1d1c1d;
+  --ink-muted: #616061;
+  --rule: rgba(29, 28, 29, 0.13);
+
+  /* Legacy alias — most pages reference --accent-clay; keep it pointed at the theme accent */
+  --accent-clay: var(--theme-accent);
 
   /* Map to shadcn tokens */
   --background: var(--bg);
@@ -71,42 +94,43 @@
   --popover-foreground: var(--ink);
   --primary: var(--ink);
   --primary-foreground: var(--bg);
-  --secondary: #F2F0EB;
+  --secondary: #f8f8f8;
   --secondary-foreground: var(--ink);
-  --muted: #F2F0EB;
+  --muted: #f8f8f8;
   --muted-foreground: var(--ink-muted);
-  --accent: var(--accent-clay);
-  --accent-foreground: #FFFFFF;
-  --destructive: #D64545;
+  --accent: var(--theme-accent);
+  --accent-foreground: #ffffff;
+  --destructive: #e01e5a;
   --border: var(--rule);
   --input: var(--rule);
-  --ring: var(--accent-clay);
+  --ring: var(--theme-accent);
 
-  --chart-1: var(--accent-clay);
-  --chart-2: #6B6760;
-  --chart-3: #8B8580;
-  --chart-4: #A39D96;
-  --chart-5: #C4BFB8;
+  --chart-1: var(--theme-accent);
+  --chart-2: #1264a3;
+  --chart-3: #2bac76;
+  --chart-4: #ecb22e;
+  --chart-5: #e01e5a;
 
-  --sidebar: var(--bg);
-  --sidebar-foreground: var(--ink);
-  --sidebar-primary: var(--ink);
-  --sidebar-primary-foreground: var(--bg);
-  --sidebar-accent: #F2F0EB;
-  --sidebar-accent-foreground: var(--ink);
-  --sidebar-border: var(--rule);
-  --sidebar-ring: var(--accent-clay);
+  --sidebar: var(--frame);
+  --sidebar-foreground: var(--frame-text);
+  --sidebar-primary: var(--frame-active);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--frame-hover);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: var(--frame-border);
+  --sidebar-ring: var(--frame-active);
 
   /* Shadows */
-  --shadow-card: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px -12px rgba(0,0,0,0.08);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.08);
 }
 
+/* Dark content area (frame stays themed) — Slack dark mode */
 .dark {
-  --bg: #1A1916;
-  --surface: #22211D;
-  --ink: #EDEAE0;
-  --ink-muted: #9C988E;
-  --rule: rgba(237, 234, 224, 0.08);
+  --bg: #1a1d21;
+  --surface: #222529;
+  --ink: #d1d2d3;
+  --ink-muted: #9a9b9e;
+  --rule: rgba(232, 232, 232, 0.11);
 
   --background: var(--bg);
   --foreground: var(--ink);
@@ -116,31 +140,31 @@
   --popover-foreground: var(--ink);
   --primary: var(--ink);
   --primary-foreground: var(--bg);
-  --secondary: #2A2925;
+  --secondary: #27292d;
   --secondary-foreground: var(--ink);
-  --muted: #2A2925;
+  --muted: #27292d;
   --muted-foreground: var(--ink-muted);
-  --accent: var(--accent-clay);
-  --accent-foreground: #FFFFFF;
-  --destructive: #E05555;
+  --accent: var(--theme-accent);
+  --accent-foreground: #ffffff;
+  --destructive: #e8437a;
   --border: var(--rule);
-  --input: rgba(237, 234, 224, 0.12);
-  --ring: var(--accent-clay);
+  --input: rgba(232, 232, 232, 0.14);
+  --ring: var(--theme-accent);
 
-  --chart-1: var(--accent-clay);
-  --chart-2: #9C988E;
-  --chart-3: #7A756E;
-  --chart-4: #5A5550;
-  --chart-5: #3A3733;
+  --chart-1: var(--theme-accent);
+  --chart-2: #4a9eda;
+  --chart-3: #41b883;
+  --chart-4: #ecb22e;
+  --chart-5: #e8437a;
 
-  --sidebar: var(--bg);
-  --sidebar-foreground: var(--ink);
-  --sidebar-primary: var(--ink);
-  --sidebar-primary-foreground: var(--bg);
-  --sidebar-accent: #2A2925;
-  --sidebar-accent-foreground: var(--ink);
-  --sidebar-border: var(--rule);
-  --sidebar-ring: var(--accent-clay);
+  --sidebar: var(--frame);
+  --sidebar-foreground: var(--frame-text);
+  --sidebar-primary: var(--frame-active);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--frame-hover);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: var(--frame-border);
+  --sidebar-ring: var(--frame-active);
 }
 
 @layer base {
@@ -150,7 +174,7 @@
   body {
     @apply bg-background text-foreground;
     font-size: 15px;
-    line-height: 1.55;
+    line-height: 1.5;
   }
   html {
     @apply font-sans;
@@ -158,15 +182,18 @@
 
   /* Focus ring */
   :focus-visible {
-    outline: 2px solid var(--accent-clay);
+    outline: 2px solid var(--theme-accent);
     outline-offset: 2px;
   }
 
-  /* Heading typography */
-  h1, h2, h3, h4 {
-    font-family: var(--font-source-serif), Georgia, 'Times New Roman', serif;
-    font-weight: 600;
-    letter-spacing: -0.01em;
+  /* Slack-style headings: bold sans, tight tracking */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-inter), -apple-system, "Segoe UI", sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.015em;
   }
 }
 
@@ -194,4 +221,34 @@
 
 .animate-panel-in {
   animation: panel-in 220ms ease-out forwards;
+}
+
+/* Live pulse dot for the news feed */
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.8);
+  }
+}
+
+.animate-live-pulse {
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+
+/* Frame scrollbars (rail + sidebar) */
+.frame-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--frame-hover) transparent;
+}
+.frame-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.frame-scroll::-webkit-scrollbar-thumb {
+  background: var(--frame-hover);
+  border-radius: 4px;
 }

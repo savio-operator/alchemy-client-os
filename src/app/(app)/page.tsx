@@ -9,6 +9,7 @@ import {
   Clock,
   CheckSquare,
   Receipt,
+  Newspaper,
 } from "lucide-react";
 import { db, initPromise } from "@/db";
 import {
@@ -20,6 +21,7 @@ import {
   tasks,
   invoices,
   leads,
+  newsItems,
 } from "@/db/schema";
 import { eq, count, desc } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
@@ -72,6 +74,13 @@ export default async function HomePage() {
           .where(eq(leads.status, "new")),
       ])
     : [null, null, null];
+
+  // Latest industry headlines for the Industry Pulse widget
+  const latestNews = await db
+    .select()
+    .from(newsItems)
+    .orderBy(desc(newsItems.publishedAt), desc(newsItems.fetchedAt))
+    .limit(6);
 
   // Recent activity — last 5 history entries across all clients
   const recentActivity = await db
@@ -187,6 +196,47 @@ export default async function HomePage() {
           );
         })}
       </div>
+
+      {/* Industry Pulse — live news widget */}
+      {latestNews.length > 0 && (
+        <section className="mb-10">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium text-[var(--ink-muted)] uppercase tracking-wide flex items-center gap-2">
+              <Newspaper className="w-4 h-4" strokeWidth={1.5} />
+              Industry Pulse
+            </h2>
+            <Link
+              href="/news"
+              className="text-xs text-[var(--theme-accent)] hover:underline flex items-center gap-1"
+            >
+              Open feed
+              <ArrowRight className="w-3 h-3" strokeWidth={2} />
+            </Link>
+          </div>
+          <div className="rounded-[var(--radius)] border border-[var(--rule)] bg-[var(--surface)] divide-y divide-[var(--rule)]">
+            {latestNews.map((item) => (
+              <a
+                key={item.id}
+                href={item.url || "/news"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--muted)] transition-colors group"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--theme-accent)] shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm truncate group-hover:text-[var(--theme-accent)] transition-colors">
+                    {item.title}
+                  </p>
+                  <p className="text-xs text-[var(--ink-muted)]">
+                    {item.source} · {item.category} ·{" "}
+                    {formatRelativeDate(item.publishedAt || item.fetchedAt)}
+                  </p>
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Recent activity — founders and managers */}
       {(isFounder || isManager) && recentActivity.length > 0 && (

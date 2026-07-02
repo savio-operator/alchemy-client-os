@@ -138,6 +138,21 @@ export const discoveries = sqliteTable("discoveries", {
   popularityScore: real("popularity_score"),
 });
 
+export const newsItems = sqliteTable("news_items", {
+  id: text("id").primaryKey(),
+  source: text("source").notNull(),
+  sourceType: text("source_type").notNull(), // rss | newsapi
+  externalId: text("external_id").notNull(),
+  title: text("title").notNull(),
+  summary: text("summary"),
+  url: text("url"),
+  imageUrl: text("image_url"),
+  category: text("category").notNull().default("general"), // branding | marketing | advertising | adtech | social | general
+  score: integer("score").notNull().default(5),
+  publishedAt: text("published_at"),
+  fetchedAt: text("fetched_at").notNull(),
+});
+
 export const clientDiscoveries = sqliteTable("client_discoveries", {
   id: text("id").primaryKey(),
   clientId: text("client_id")
@@ -551,6 +566,7 @@ export type Idea = typeof ideas.$inferSelect;
 export type Campaign = typeof campaigns.$inferSelect;
 export type SocialPost = typeof socialPosts.$inferSelect;
 export type Discovery = typeof discoveries.$inferSelect;
+export type NewsItem = typeof newsItems.$inferSelect;
 export type ClientDiscovery = typeof clientDiscoveries.$inferSelect;
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type Prediction = typeof predictions.$inferSelect;

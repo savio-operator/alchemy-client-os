@@ -134,61 +134,65 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
   };
 
   return (
-    <header className="h-14 border-b border-[var(--rule)] flex items-center justify-between px-3 md:px-4 shrink-0 bg-[var(--bg)]">
+    <header className="h-[44px] flex items-center gap-2 px-2 md:px-3 shrink-0 bg-[var(--frame-dark)]">
       {/* Mobile hamburger + Breadcrumbs */}
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-1.5 min-w-0 md:w-56 shrink-0">
         <button
           onClick={() => setMobileOpen(true)}
-          className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)] transition-colors md:hidden"
+          className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-[var(--frame-hover)] transition-colors md:hidden"
           aria-label="Open menu"
         >
-          <Menu className="w-5 h-5 text-[var(--ink-muted)]" strokeWidth={1.5} />
+          <Menu className="w-5 h-5 text-[var(--frame-text)]" strokeWidth={1.5} />
         </button>
-      <nav className="flex items-center gap-1.5 text-sm min-w-0">
-        {breadcrumbs.map((crumb, i) => (
-          <span key={i} className="flex items-center gap-1.5 min-w-0">
-            {i > 0 && <span className="text-[var(--ink-muted)]">/</span>}
-            {crumb.href ? (
-              <a
-                href={crumb.href}
-                className="text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors duration-120 truncate"
-              >
-                {crumb.label}
-              </a>
-            ) : (
-              <span className="font-medium truncate">{crumb.label}</span>
-            )}
-          </span>
-        ))}
-      </nav>
+        <nav className="flex items-center gap-1.5 text-sm min-w-0">
+          {breadcrumbs.map((crumb, i) => (
+            <span key={i} className="flex items-center gap-1.5 min-w-0">
+              {i > 0 && <span className="text-[var(--frame-text-dim)]">/</span>}
+              {crumb.href ? (
+                <a
+                  href={crumb.href}
+                  className="text-[var(--frame-text-dim)] hover:text-white transition-colors duration-120 truncate"
+                >
+                  {crumb.label}
+                </a>
+              ) : (
+                <span className="font-medium text-[var(--frame-text)] truncate">
+                  {crumb.label}
+                </span>
+              )}
+            </span>
+          ))}
+        </nav>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-1">
-        {/* Command palette trigger */}
+      {/* Centered search — Slack style */}
+      <div className="flex-1 flex justify-center min-w-0 px-2">
         <button
           onClick={() => openPalette(true)}
-          className="flex items-center gap-2 h-8 px-3 rounded-[var(--radius-sm)] border border-[var(--rule)] text-sm text-[var(--ink-muted)] hover:bg-[var(--muted)] transition-colors duration-120"
+          className="w-full max-w-[640px] h-7 flex items-center gap-2 px-3 rounded-md bg-white/20 hover:bg-white/25 text-[13px] text-white/85 transition-colors"
         >
-          <span className="hidden sm:inline">Ask</span>
-          <kbd className="text-xs bg-[var(--muted)] px-1.5 py-0.5 rounded font-mono flex items-center gap-0.5">
+          <span className="truncate">Search Adchemy or ask AI</span>
+          <kbd className="ml-auto hidden sm:flex text-[11px] text-white/70 font-mono items-center gap-0.5">
             <Command className="w-3 h-3" strokeWidth={1.5} />K
           </kbd>
         </button>
+      </div>
 
+      {/* Actions */}
+      <div className="flex items-center gap-0.5 md:w-56 shrink-0 justify-end">
         {/* Notifications */}
         <div className="relative" ref={notifRef}>
           <button
             onClick={() => setShowNotifs(!showNotifs)}
-            className="relative w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)] transition-colors duration-120"
+            className="relative w-8 h-8 flex items-center justify-center rounded-md hover:bg-[var(--frame-hover)] transition-colors duration-120"
             aria-label="Notifications"
           >
             <Bell
-              className="w-4 h-4 text-[var(--ink-muted)]"
+              className="w-4 h-4 text-[var(--frame-text)]"
               strokeWidth={1.5}
             />
             {notifCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[var(--accent-clay)] text-white text-[9px] font-medium rounded-full flex items-center justify-center">
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#e01e5a] text-white text-[9px] font-medium rounded-full flex items-center justify-center">
                 {notifCount > 9 ? "9+" : notifCount}
               </span>
             )}
@@ -248,11 +252,11 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
         {/* Agent drawer toggle */}
         <button
           onClick={toggleDrawer}
-          className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)] transition-colors duration-120"
+          className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-[var(--frame-hover)] transition-colors duration-120"
           aria-label="AI Chat"
         >
           <PanelRight
-            className="w-4 h-4 text-[var(--ink-muted)]"
+            className="w-4 h-4 text-[var(--frame-text)]"
             strokeWidth={1.5}
           />
         </button>
@@ -261,10 +265,10 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setShowMenu(!showMenu)}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--accent-clay)]/10 hover:bg-[var(--accent-clay)]/20 transition-colors duration-120"
+            className="w-8 h-8 flex items-center justify-center rounded-[8px] bg-[var(--frame-hover)] hover:bg-[var(--frame-active)] transition-colors duration-120"
             aria-label="User menu"
           >
-            <span className="text-xs font-medium text-[var(--accent-clay)]">
+            <span className="text-xs font-bold text-white">
               {userName
                 ? userName
                     .split(" ")

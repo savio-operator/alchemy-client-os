@@ -503,6 +503,28 @@ async function initTables() {
     );
   `);
 
+  // Industry news feed (global, not per-client)
+  await client.executeMultiple(`
+    CREATE TABLE IF NOT EXISTS news_items (
+      id TEXT PRIMARY KEY,
+      source TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      external_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      summary TEXT,
+      url TEXT,
+      image_url TEXT,
+      category TEXT NOT NULL DEFAULT 'general',
+      score INTEGER NOT NULL DEFAULT 5,
+      published_at TEXT,
+      fetched_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_news_external
+      ON news_items(source, external_id);
+    CREATE INDEX IF NOT EXISTS idx_news_published
+      ON news_items(published_at DESC);
+  `);
+
   // Idempotent ALTER TABLE statements for new columns
   const alters = [
     "ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE CASCADE",
