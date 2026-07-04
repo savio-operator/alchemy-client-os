@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { NewsItem } from "@/db/schema";
 import { QuickLook } from "@/components/quick-look";
+import { ShareToChatButton } from "@/components/share-to-chat";
 
 const CATEGORY_STYLES: Record<string, string> = {
   branding: "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300",
@@ -215,16 +216,19 @@ function NewsCard({
             </p>
           )}
         </div>
-        <a
-          href={item.url || "#"}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          aria-label="Open on original site"
-          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--muted)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-        >
-          <ExternalLink className="w-4 h-4 text-[var(--ink-muted)]" strokeWidth={1.8} />
-        </a>
+        <div className="flex items-center gap-0.5 shrink-0">
+          {item.url && <ShareToChatButton title={item.title} url={item.url} source={item.source} />}
+          <a
+            href={item.url || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Open on original site"
+            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--muted)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+          >
+            <ExternalLink className="w-4 h-4 text-[var(--ink-muted)]" strokeWidth={1.8} />
+          </a>
+        </div>
       </div>
     </div>
   );

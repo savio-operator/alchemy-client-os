@@ -4,6 +4,7 @@ import { ideas, memories, clients, clientBrief, tasks } from "@/db/schema";
 import { getAuthedClient } from "@/lib/integrations/google";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
+import { searchEverything, flattenResults } from "@/lib/global-search";
 
 export interface ToolDefinition {
   name: string;
@@ -30,6 +31,12 @@ const BASE_TOOLS: ToolDefinition[] = [
   {
     name: "search_history",
     description: "Search client history entries",
+    args: "{query: string}",
+  },
+  {
+    name: "search_app",
+    description:
+      "Search across everything in the OS at once — clients, tasks, ideas, leads, campaigns, invoices, news, and client feed discoveries. Use this for any general knowledge question about what's in the app, not just history.",
     args: "{query: string}",
   },
   {
@@ -198,6 +205,13 @@ export async function executeTool(
       );
       if (results.length === 0) return "No history entries found.";
       return JSON.stringify(results.slice(0, 10));
+    }
+
+    case "search_app": {
+      const grouped = await searchEverything(args.query as string);
+      const results = flattenResults(grouped);
+      if (results.length === 0) return "No matches found anywhere in the app.";
+      return JSON.stringify(results.slice(0, 20));
     }
 
     case "save_memory": {

@@ -61,7 +61,8 @@
       "Bash(ls -la .env*)",
       "Bash(lsof -i :3111 -sTCP:LISTEN)",
       "Bash(git --no-pager diff src/lib/chat-tools.ts)",
-      "Bash(echo \"exit:$?\")"
+      "Bash(echo \"exit:$?\")",
+      "Bash(npx next *)"
     ]
   },
   "enableAllProjectMcpServers": true

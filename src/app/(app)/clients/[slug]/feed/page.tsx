@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { QuickLook } from "@/components/quick-look";
+import { ShareToChatButton } from "@/components/share-to-chat";
 
 interface DiscoveryItem {
   id: string;
@@ -255,6 +256,14 @@ export default function FeedPage() {
                       >
                         <ExternalLink className="w-3.5 h-3.5 text-[var(--ink-muted)]" strokeWidth={1.5} />
                       </a>
+                    )}
+                    {item.discovery.externalUrl && (
+                      <ShareToChatButton
+                        title={item.discovery.title || item.discovery.sourceName}
+                        url={item.discovery.externalUrl}
+                        source={item.discovery.sourceName}
+                        className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)]"
+                      />
                     )}
                     <button
                       onClick={() => handleSave(item.id)}

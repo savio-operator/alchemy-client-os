@@ -116,6 +116,7 @@ function FormattedText({ text }: { text: string }) {
       { re: /`(.+?)`/, type: "code" },
       { re: /~~(.+?)~~/, type: "strike" },
       { re: /\|\|(.+?)\|\|/, type: "spoiler" },
+      { re: /(https?:\/\/[^\s<>()]+)/, type: "link" },
     ];
 
     let earliest: { index: number; length: number; content: string; type: string } | null = null;
@@ -155,6 +156,20 @@ function FormattedText({ text }: { text: string }) {
             );
           case "strike":
             return <del key={i}>{seg.content}</del>;
+          case "link":
+            return (
+              <a
+                key={i}
+                href={seg.content}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="underline underline-offset-2 hover:opacity-80"
+                style={{ color: "var(--theme-accent)" }}
+              >
+                {seg.content}
+              </a>
+            );
           case "spoiler":
             return (
               <span

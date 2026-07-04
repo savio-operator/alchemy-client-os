@@ -161,7 +161,7 @@
   --frame-glass-strong: hsl(var(--tint-h) calc(var(--tint-s) * 0.6%) 16% / calc(0.86 * var(--glass-opacity)));
 }
 
-/* Dark content area — same tint, dark lightness */
+/* Dark content area (frame stays themed) — same tint, dark lightness */
 .dark {
   --bg: hsl(var(--tint-h) calc(var(--tint-s) * 0.5%) 12.5%);
   --surface: hsl(var(--tint-h) calc(var(--tint-s) * 0.48%) 16.5%);
@@ -171,16 +171,6 @@
 
   /* Brighter accent for dark surfaces */
   --theme-accent: hsl(var(--tint-h) calc(var(--tint-s) * 0.8%) 56%);
-
-  /* macOS-style dark chrome: the rail/sidebar/top-bar go neutral graphite
-     instead of staying workspace-tinted, matching Finder/Xcode dark
-     sidebars — only a whisper of the tint hue survives, same as how macOS
-     lets the accent color show through selection, not the whole chrome. */
-  --frame: hsl(var(--tint-h) calc(var(--tint-s) * 0.08%) 15%);
-  --frame-dark: hsl(var(--tint-h) calc(var(--tint-s) * 0.08%) 11%);
-  --frame-darker: hsl(var(--tint-h) calc(var(--tint-s) * 0.08%) 8%);
-  --frame-glass: hsl(var(--tint-h) calc(var(--tint-s) * 0.08%) 15% / calc(0.72 * var(--glass-opacity)));
-  --frame-glass-strong: hsl(var(--tint-h) calc(var(--tint-s) * 0.08%) 15% / calc(0.86 * var(--glass-opacity)));
 
   --background: var(--bg);
   --foreground: var(--ink);
