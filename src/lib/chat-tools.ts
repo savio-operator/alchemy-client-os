@@ -1,8 +1,8 @@
 import { db } from "@/db";
 import { searchHistory } from "@/db";
-import { ideas, memories, clients, clientBrief } from "@/db/schema";
+import { ideas, memories, clients, clientBrief, tasks } from "@/db/schema";
 import { getAuthedClient } from "@/lib/integrations/google";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
 
 export interface ToolDefinition {
@@ -36,6 +36,21 @@ const BASE_TOOLS: ToolDefinition[] = [
     name: "save_memory",
     description: "Save a key fact to long-term memory",
     args: "{fact: string}",
+  },
+  {
+    name: "create_task",
+    description: "Create a task, optionally for a client",
+    args: '{title: string, description?: string, dueDate?: "YYYY-MM-DD", priority?: "low"|"medium"|"high"|"urgent", clientSlug?: string}',
+  },
+  {
+    name: "list_tasks",
+    description: "List tasks, optionally filtered by status",
+    args: '{status?: "todo"|"in_progress"|"done", clientSlug?: string}',
+  },
+  {
+    name: "update_task_status",
+    description: "Change a task's status by its id (get the id from list_tasks first)",
+    args: '{taskId: string, status: "todo"|"in_progress"|"done"}',
   },
 ];
 
@@ -198,6 +213,59 @@ export async function executeTool(
         })
         .run();
       return `Saved to memory: "${args.fact}"`;
+    }
+
+    case "create_task": {
+      let targetClientId: string | null = clientId === "global" ? null : clientId;
+      if (args.clientSlug) {
+        const c = await db.select().from(clients).where(eq(clients.slug, args.clientSlug as string)).get();
+        if (!c) return `Client "${args.clientSlug}" not found.`;
+        targetClientId = c.id;
+      }
+      const now = new Date().toISOString();
+      const task = {
+        id: crypto.randomUUID(),
+        title: args.title as string,
+        description: (args.description as string) || null,
+        clientId: targetClientId,
+        dueDate: (args.dueDate as string) || null,
+        priority: (args.priority as string) || "medium",
+        status: "todo",
+        assignedTo: null,
+        completedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await db.insert(tasks).values(task).run();
+      return `Created task: "${task.title}"`;
+    }
+
+    case "list_tasks": {
+      const conditions = [];
+      if (args.status) conditions.push(eq(tasks.status, args.status as string));
+      if (args.clientSlug) {
+        const c = await db.select().from(clients).where(eq(clients.slug, args.clientSlug as string)).get();
+        if (!c) return `Client "${args.clientSlug}" not found.`;
+        conditions.push(eq(tasks.clientId, c.id));
+      }
+      const rows =
+        conditions.length > 0
+          ? await db.select().from(tasks).where(and(...conditions)).all()
+          : await db.select().from(tasks).all();
+      return JSON.stringify(rows.slice(0, 20));
+    }
+
+    case "update_task_status": {
+      const existing = await db.select().from(tasks).where(eq(tasks.id, args.taskId as string)).get();
+      if (!existing) return `Task "${args.taskId}" not found.`;
+      const now = new Date().toISOString();
+      const status = args.status as string;
+      await db
+        .update(tasks)
+        .set({ status, completedAt: status === "done" ? now : null, updatedAt: now })
+        .where(eq(tasks.id, args.taskId as string))
+        .run();
+      return `Updated "${existing.title}" to ${status}.`;
     }
 
     case "list_clients": {

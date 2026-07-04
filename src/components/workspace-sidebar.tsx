@@ -62,7 +62,7 @@ export function WorkspaceSidebar({
   const activeClients = clients.filter((c) => !c.archivedAt);
 
   return (
-    <div className="w-[256px] shrink-0 flex flex-col bg-[var(--frame)] min-h-0">
+    <div className="w-[256px] shrink-0 flex flex-col bg-[var(--frame-glass-strong)] backdrop-blur-2xl backdrop-saturate-[2] min-h-0">
       {/* Workspace header */}
       <div className="h-[50px] shrink-0 px-4 flex items-center justify-between border-b border-[var(--frame-border)]">
         <button className="flex items-center gap-1 text-white font-bold text-[17px] tracking-tight hover:bg-[var(--frame-hover)] rounded-md px-1.5 py-0.5 -ml-1.5 transition-colors">

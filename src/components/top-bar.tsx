@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Command, PanelRight, LogOut, Pencil, Check, X, Menu } from "lucide-react";
+import { Bell, Command, PanelRight, LogOut, Pencil, Check, X, Menu, Droplet } from "lucide-react";
 import { useCommandPalette } from "@/store/command-palette";
 import { useDrawer } from "@/store/drawer";
 import { useUser } from "@/store/user";
 import { useSidebar } from "@/store/sidebar";
+import { getGlassOpacity, setGlassOpacity } from "@/lib/glass-opacity";
 
 interface Notification {
   id: string;
@@ -32,11 +33,14 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showGlass, setShowGlass] = useState(false);
+  const [glassOpacity, setGlassOpacityState] = useState(100);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(userName || "");
   const [nameSaving, setNameSaving] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+  const glassRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   const fetchNotifs = () => {
@@ -59,6 +63,10 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
     setNameValue(userName || "");
   }, [userName]);
 
+  useEffect(() => {
+    setGlassOpacityState(getGlassOpacity());
+  }, []);
+
   // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -69,10 +77,18 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
         setShowNotifs(false);
       }
+      if (glassRef.current && !glassRef.current.contains(e.target as Node)) {
+        setShowGlass(false);
+      }
     };
-    if (showMenu || showNotifs) document.addEventListener("mousedown", handler);
+    if (showMenu || showNotifs || showGlass) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [showMenu, showNotifs]);
+  }, [showMenu, showNotifs, showGlass]);
+
+  const handleGlassOpacity = (percent: number) => {
+    setGlassOpacityState(percent);
+    setGlassOpacity(percent);
+  };
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -169,7 +185,7 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
       <div className="flex-1 flex justify-center min-w-0 px-2">
         <button
           onClick={() => openPalette(true)}
-          className="w-full max-w-[640px] h-7 flex items-center gap-2 px-3 rounded-md bg-white/20 hover:bg-white/25 text-[13px] text-white/85 transition-colors"
+          className="glass-sheen w-full max-w-[640px] h-7 flex items-center gap-2 px-3.5 rounded-full bg-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] hover:bg-white/25 text-[13px] text-white/85 transition-colors"
         >
           <span className="truncate">Search Adchemy or ask AI</span>
           <kbd className="ml-auto hidden sm:flex text-[11px] text-white/70 font-mono items-center gap-0.5">
@@ -199,7 +215,7 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
           </button>
 
           {showNotifs && (
-            <div className="absolute right-0 top-10 w-[calc(100vw-2rem)] sm:w-80 max-h-96 bg-[var(--surface)] border border-[var(--rule)] rounded-[var(--radius)] shadow-lg z-50 flex flex-col">
+            <div className="absolute right-0 top-10 w-[calc(100vw-2rem)] sm:w-80 max-h-96 material border border-[var(--rule)] rounded-xl shadow-elevated animate-pop-in z-50 flex flex-col overflow-hidden">
               <div className="px-3 py-2 border-b border-[var(--rule)] flex items-center justify-between">
                 <span className="text-sm font-medium">Notifications</span>
                 {notifCount > 0 && (
@@ -249,6 +265,44 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
           )}
         </div>
 
+        {/* Glass transparency */}
+        <div className="relative" ref={glassRef}>
+          <button
+            onClick={() => setShowGlass(!showGlass)}
+            className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-[var(--frame-hover)] transition-colors duration-120"
+            aria-label="Adjust transparency"
+            title="Adjust transparency"
+          >
+            <Droplet
+              className="w-4 h-4 text-[var(--frame-text)]"
+              strokeWidth={1.5}
+            />
+          </button>
+
+          {showGlass && (
+            <div className="absolute right-0 top-10 w-64 material border border-[var(--rule)] rounded-xl shadow-elevated animate-pop-in z-50 p-4">
+              <p className="text-sm font-medium mb-0.5">Window transparency</p>
+              <p className="text-xs text-[var(--ink-muted)] mb-3">
+                How much of the glass chrome lets content show through
+              </p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={30}
+                  max={100}
+                  step={1}
+                  value={glassOpacity}
+                  onChange={(e) => handleGlassOpacity(Number(e.target.value))}
+                  className="flex-1 accent-[var(--theme-accent)]"
+                />
+                <span className="w-10 text-right text-xs text-[var(--ink-muted)] tabular-nums">
+                  {glassOpacity}%
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Agent drawer toggle */}
         <button
           onClick={toggleDrawer}
@@ -281,7 +335,7 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
           </button>
 
           {showMenu && (
-            <div className="absolute right-0 top-10 w-56 bg-[var(--surface)] border border-[var(--rule)] rounded-[var(--radius)] shadow-lg z-50">
+            <div className="absolute right-0 top-10 w-56 material border border-[var(--rule)] rounded-xl shadow-elevated animate-pop-in z-50 overflow-hidden">
               <div className="px-3 py-2.5 border-b border-[var(--rule)]">
                 {editingName ? (
                   <div className="flex items-center gap-1.5">

@@ -1511,9 +1511,12 @@ export default function TeamChatPage() {
 
           {/* Text Channels */}
           <div className="mb-2">
-            <button
-              className="flex items-center gap-1 px-2 py-1 w-full text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors"
+            <div
+              role="button"
+              tabIndex={0}
+              className="flex items-center gap-1 px-2 py-1 w-full text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors cursor-pointer"
               onClick={() => setTextChannelsOpen((v) => !v)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setTextChannelsOpen((v) => !v); } }}
             >
               {textChannelsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
               <span>Text Channels</span>
@@ -1526,7 +1529,7 @@ export default function TeamChatPage() {
                   <Plus className="w-3.5 h-3.5" />
                 </button>
               )}
-            </button>
+            </div>
 
             {textChannelsOpen && textChannels.map((ch) => (
               <ChannelItem
@@ -1545,9 +1548,12 @@ export default function TeamChatPage() {
 
           {/* Voice Channels */}
           <div className="mb-2">
-            <button
-              className="flex items-center gap-1 px-2 py-1 w-full text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors"
+            <div
+              role="button"
+              tabIndex={0}
+              className="flex items-center gap-1 px-2 py-1 w-full text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors cursor-pointer"
               onClick={() => setVoiceChannelsOpen((v) => !v)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setVoiceChannelsOpen((v) => !v); } }}
             >
               {voiceChannelsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
               <span>Voice Channels</span>
@@ -1560,7 +1566,7 @@ export default function TeamChatPage() {
                   <Plus className="w-3.5 h-3.5" />
                 </button>
               )}
-            </button>
+            </div>
             {voiceChannelsOpen && voiceChannels.map((ch) => (
               <div key={ch.id}>
                 <ChannelItem

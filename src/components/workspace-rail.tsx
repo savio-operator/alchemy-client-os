@@ -86,7 +86,7 @@ export function WorkspaceRail({
   );
 
   return (
-    <div className="w-[68px] shrink-0 flex flex-col items-center bg-[var(--frame-dark)] pt-2 pb-3">
+    <div className="w-[68px] shrink-0 flex flex-col items-center bg-[var(--frame-glass)] backdrop-blur-2xl backdrop-saturate-[2] pt-2 pb-3">
       {/* Workspace mark */}
       <Link
         href="/"

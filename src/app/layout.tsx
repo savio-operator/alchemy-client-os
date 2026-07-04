@@ -41,7 +41,7 @@ export default function RootLayout({
         <script
           suppressHydrationWarning
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("theme");if(t==="dark")document.documentElement.classList.add("dark");var v=localStorage.getItem("adchemy-frame-vars-v2");if(v){var p=JSON.parse(v);for(var k in p)document.documentElement.style.setProperty(k,p[k])}}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem("theme");if(t==="dark")document.documentElement.classList.add("dark");var v=localStorage.getItem("adchemy-frame-vars-v2");if(v){var p=JSON.parse(v);for(var k in p)document.documentElement.style.setProperty(k,p[k])}var g=localStorage.getItem("adchemy-glass-opacity");if(g)document.documentElement.style.setProperty("--glass-opacity",g)}catch(e){}})();`,
           }}
         />
         {children}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   Pencil,
   Check,
+  Sparkles,
 } from "lucide-react";
 import { useDrawer } from "@/store/drawer";
 import { useChat } from "@/store/chat";
@@ -21,10 +22,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
+interface Suggestion {
+  id: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
 export function AgentDrawer() {
   const { open, setOpen } = useDrawer();
   const params = useParams();
+  const router = useRouter();
   const slug = params?.slug as string | undefined;
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
 
   const {
     activeConversationId,
@@ -100,6 +113,43 @@ export function AgentDrawer() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Load proactive assistant suggestions (a filtered slice of the same
+  // notifications the top-bar bell shows) whenever that tab is opened.
+  useEffect(() => {
+    if (!open || !showSuggestions) return;
+    fetch("/api/notifications")
+      .then((r) => r.json())
+      .then((data) => {
+        const items = (data.items || []) as Array<{
+          id: string;
+          type: string;
+          title: string;
+          body: string | null;
+          link: string | null;
+          isRead: boolean;
+          createdAt: string;
+        }>;
+        setSuggestions(items.filter((n) => n.type === "assistant_suggestion"));
+      });
+  }, [open, showSuggestions]);
+
+  const handleOpenSuggestion = async (s: Suggestion) => {
+    if (!s.isRead) {
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: s.id, action: "read" }),
+      });
+      setSuggestions((prev) =>
+        prev.map((p) => (p.id === s.id ? { ...p, isRead: true } : p))
+      );
+    }
+    if (s.link) {
+      setOpen(false);
+      router.push(s.link);
+    }
+  };
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || sending || !clientId) return;
@@ -232,7 +282,17 @@ export function AgentDrawer() {
           {/* Header */}
           <div className="h-14 flex items-center justify-between px-4 border-b border-[var(--rule)]">
             <div className="flex items-center gap-2">
-              {showList ? (
+              {showSuggestions ? (
+                <button
+                  onClick={() => setShowSuggestions(false)}
+                  className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)]"
+                >
+                  <ChevronLeft
+                    className="w-4 h-4 text-[var(--ink-muted)]"
+                    strokeWidth={1.5}
+                  />
+                </button>
+              ) : showList ? (
                 <button
                   onClick={() => setShowList(false)}
                   className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)]"
@@ -255,10 +315,22 @@ export function AgentDrawer() {
                 </button>
               )}
               <span className="text-sm font-medium">
-                {showList ? "Chats" : "Chat"}
+                {showSuggestions ? "Suggestions" : showList ? "Chats" : "Chat"}
               </span>
             </div>
             <div className="flex items-center gap-1">
+              {!showSuggestions && (
+                <button
+                  onClick={() => setShowSuggestions(true)}
+                  className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)]"
+                  title="Suggestions"
+                >
+                  <Sparkles
+                    className="w-4 h-4 text-[var(--ink-muted)]"
+                    strokeWidth={1.5}
+                  />
+                </button>
+              )}
               <button
                 onClick={handleNewChat}
                 className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)]"
@@ -285,7 +357,59 @@ export function AgentDrawer() {
             </div>
           </div>
 
-          {showList ? (
+          {showSuggestions ? (
+            /* Proactive suggestions — surfaced by the assistant watcher
+               (hot news, high-signal client mentions, overdue tasks) */
+            <div className="flex-1 overflow-y-auto">
+              {suggestions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center px-6">
+                  <Sparkles
+                    className="w-8 h-8 text-[var(--ink-muted)] mb-3"
+                    strokeWidth={1}
+                  />
+                  <p className="text-sm text-[var(--ink-muted)]">
+                    Nothing to flag right now
+                  </p>
+                  <p className="text-xs text-[var(--ink-muted)] mt-1 max-w-[240px]">
+                    The assistant checks industry news, client feeds, and task
+                    due dates every 20 minutes and surfaces anything worth
+                    your attention here.
+                  </p>
+                </div>
+              ) : (
+                suggestions.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => handleOpenSuggestion(s)}
+                    className={`w-full text-left flex items-start gap-3 px-4 py-3 border-b border-[var(--rule)] hover:bg-[var(--muted)] transition-colors ${
+                      s.isRead ? "opacity-60" : ""
+                    }`}
+                  >
+                    <Sparkles
+                      className="w-4 h-4 text-[var(--theme-accent)] shrink-0 mt-0.5"
+                      strokeWidth={1.5}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{s.title}</p>
+                      {s.body && (
+                        <p className="text-xs text-[var(--ink-muted)] mt-0.5 line-clamp-2">
+                          {s.body}
+                        </p>
+                      )}
+                      <p className="text-[10px] text-[var(--ink-muted)] mt-1">
+                        {new Date(s.createdAt).toLocaleString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          ) : showList ? (
             /* Conversation list */
             <div className="flex-1 overflow-y-auto">
               {conversations.length === 0 ? (

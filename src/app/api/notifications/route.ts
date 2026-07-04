@@ -3,10 +3,16 @@ import { db } from "@/db";
 import { notifications } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
+import { startAssistantWatcher } from "@/lib/assistant-watcher";
 
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Lazy-start the assistant watcher the same way news-engine piggybacks on
+  // /api/news — this route is already polled every 5 min by every logged-in
+  // session, so it's a reliable, no-extra-infra place to kick the cron off.
+  startAssistantWatcher();
 
   const items = await db
     .select()

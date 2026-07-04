@@ -52,7 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const isFounder = user?.role === "founder";
 
   const sidebar = (
-    <Suspense fallback={<div className="w-[256px] shrink-0 bg-[var(--frame)]" />}>
+    <Suspense fallback={<div className="w-[256px] shrink-0 bg-[var(--frame-glass-strong)]" />}>
       <WorkspaceSidebar
         clients={clients}
         isFounder={isFounder}
@@ -73,7 +73,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Mobile overlay */}
         {mobileOpen && (
           <div
-            className="fixed inset-0 bg-black/40 z-40 md:hidden"
+            className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-40 md:hidden"
             onClick={() => setMobileOpen(false)}
           />
         )}
@@ -82,7 +82,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div
           className={`
             fixed inset-y-0 left-0 z-50 flex md:relative md:z-auto md:inset-auto
-            bg-[var(--frame-dark)]
+            bg-[var(--frame-glass)] backdrop-blur-2xl backdrop-saturate-[2]
             transform transition-transform duration-200 ease-in-out
             ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
             md:translate-x-0
@@ -97,7 +97,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         {/* Content panel — the light rounded surface inside the frame */}
-        <main className="flex-1 min-w-0 overflow-y-auto bg-[var(--bg)] md:rounded-tl-lg border-t border-l border-[var(--rule)]/40">
+        <main className="flex-1 min-w-0 overflow-y-auto bg-[var(--bg)] md:rounded-tl-xl border-t border-l border-[var(--rule)]/40">
           <div className="animate-panel-in">{children}</div>
         </main>
       </div>

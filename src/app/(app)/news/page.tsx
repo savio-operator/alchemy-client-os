@@ -10,6 +10,7 @@ import {
   Newspaper,
 } from "lucide-react";
 import type { NewsItem } from "@/db/schema";
+import { QuickLook } from "@/components/quick-look";
 
 const CATEGORY_STYLES: Record<string, string> = {
   branding: "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300",
@@ -31,6 +32,7 @@ function NewsFeed() {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [previewItem, setPreviewItem] = useState<NewsItem | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350);
@@ -138,24 +140,51 @@ function NewsFeed() {
       ) : (
         <div className="space-y-2">
           {items.map((item) => (
-            <NewsCard key={item.id} item={item} />
+            <NewsCard key={item.id} item={item} onPreview={setPreviewItem} />
           ))}
         </div>
+      )}
+
+      {previewItem?.url && (
+        <QuickLook
+          url={previewItem.url}
+          title={previewItem.title}
+          source={previewItem.source}
+          onClose={() => setPreviewItem(null)}
+        />
       )}
     </div>
   );
 }
 
-function NewsCard({ item }: { item: NewsItem }) {
+function NewsCard({
+  item,
+  onPreview,
+}: {
+  item: NewsItem;
+  onPreview: (item: NewsItem) => void;
+}) {
   const categoryStyle = CATEGORY_STYLES[item.category] || CATEGORY_STYLES.general;
   const isHot = item.score >= 8;
 
+  // Quick Look: click (or Space/Enter, like macOS) opens the in-app reader;
+  // the external-link icon still opens the original site.
+  const openPreview = () => {
+    if (item.url) onPreview(item);
+  };
+
   return (
-    <a
-      href={item.url || "#"}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group block rounded-lg border border-[var(--rule)] bg-[var(--surface)] p-4 hover:border-[var(--theme-accent)]/40 hover:shadow-card transition-all"
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={openPreview}
+      onKeyDown={(e) => {
+        if (e.key === " " || e.key === "Enter") {
+          e.preventDefault();
+          openPreview();
+        }
+      }}
+      className="group block cursor-pointer rounded-lg border border-[var(--rule)] bg-[var(--surface)] p-4 hover:border-[var(--theme-accent)]/40 hover:shadow-card active:scale-[0.99] transition-all ease-[var(--ease-apple)]"
     >
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
@@ -186,12 +215,18 @@ function NewsCard({ item }: { item: NewsItem }) {
             </p>
           )}
         </div>
-        <ExternalLink
-          className="w-4 h-4 text-[var(--ink-muted)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1"
-          strokeWidth={1.8}
-        />
+        <a
+          href={item.url || "#"}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Open on original site"
+          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--muted)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+        >
+          <ExternalLink className="w-4 h-4 text-[var(--ink-muted)]" strokeWidth={1.8} />
+        </a>
       </div>
-    </a>
+    </div>
   );
 }
 

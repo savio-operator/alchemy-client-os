@@ -9,9 +9,11 @@ import {
   X,
   Sparkles,
   Filter,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { QuickLook } from "@/components/quick-look";
 
 interface DiscoveryItem {
   id: string;
@@ -50,6 +52,7 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [minScore, setMinScore] = useState(5);
+  const [previewItem, setPreviewItem] = useState<DiscoveryItem | null>(null);
 
   const fetchFeed = useCallback(async () => {
     const res = await fetch(
@@ -197,7 +200,16 @@ export default function FeedPage() {
 
                 {/* Content */}
                 {item.discovery.title && (
-                  <h3 className="text-sm font-medium mb-1">
+                  <h3
+                    className={`text-sm font-medium mb-1 ${
+                      item.discovery.externalUrl
+                        ? "cursor-pointer hover:text-[var(--accent-clay)] transition-colors"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      item.discovery.externalUrl && setPreviewItem(item)
+                    }
+                  >
                     {item.discovery.title}
                   </h3>
                 )}
@@ -225,6 +237,15 @@ export default function FeedPage() {
                   </div>
 
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-120">
+                    {item.discovery.externalUrl && (
+                      <button
+                        onClick={() => setPreviewItem(item)}
+                        className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)]"
+                        title="Quick Look"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-[var(--ink-muted)]" strokeWidth={1.5} />
+                      </button>
+                    )}
                     {item.discovery.externalUrl && (
                       <a
                         href={item.discovery.externalUrl}
@@ -261,6 +282,15 @@ export default function FeedPage() {
             );
           })}
         </div>
+      )}
+
+      {previewItem?.discovery.externalUrl && (
+        <QuickLook
+          url={previewItem.discovery.externalUrl}
+          title={previewItem.discovery.title}
+          source={previewItem.discovery.sourceName}
+          onClose={() => setPreviewItem(null)}
+        />
       )}
     </div>
   );

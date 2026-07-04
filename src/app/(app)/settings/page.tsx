@@ -9,6 +9,7 @@ import {
   Loader2,
   Moon,
   Sun,
+  SlidersHorizontal,
   Rss,
   Zap,
   LogOut,
@@ -21,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ThemeColorPicker } from "@/components/theme-color-picker";
 import { useUser } from "@/store/user";
+import { getGlassOpacity, setGlassOpacity as applyGlassOpacity } from "@/lib/glass-opacity";
 
 interface Integration {
   provider: string;
@@ -60,6 +62,7 @@ export default function SettingsPage() {
   const [pollResult, setPollResult] = useState<string | null>(null);
   const [scoreResult, setScoreResult] = useState<string | null>(null);
   const [dark, setDark] = useState(false);
+  const [glassOpacity, setGlassOpacity] = useState(100);
   // Profile editing
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
@@ -94,6 +97,13 @@ export default function SettingsPage() {
       setOriginalEmail(email);
     }
   }, [currentUser]);
+
+  // Reflect the actual persisted appearance state (set by the boot script
+  // in layout.tsx before hydration) rather than assuming light/100%.
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains("dark"));
+    setGlassOpacity(getGlassOpacity());
+  }, []);
 
   const emailChanged = editEmail !== originalEmail;
 
@@ -202,6 +212,11 @@ export default function SettingsPage() {
     localStorage.setItem("theme", next ? "dark" : "light");
   };
 
+  const handleGlassOpacity = (percent: number) => {
+    setGlassOpacity(percent);
+    applyGlassOpacity(percent);
+  };
+
   const handleDisconnect = async (provider: string) => {
     await fetch("/api/integrations", {
       method: "DELETE",
@@ -273,6 +288,31 @@ export default function SettingsPage() {
           </div>
           <div className="mt-5 pt-5 border-t border-[var(--rule)]">
             <ThemeColorPicker />
+          </div>
+          <div className="mt-5 pt-5 border-t border-[var(--rule)]">
+            <div className="flex items-center gap-3 mb-3">
+              <SlidersHorizontal className="w-4 h-4 text-[var(--ink-muted)]" strokeWidth={1.5} />
+              <div>
+                <p className="text-sm font-medium">Window transparency</p>
+                <p className="text-xs text-[var(--ink-muted)]">
+                  How much of the glass chrome (sidebar, popovers, sheets) lets content show through
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 pl-7">
+              <input
+                type="range"
+                min={30}
+                max={100}
+                step={1}
+                value={glassOpacity}
+                onChange={(e) => handleGlassOpacity(Number(e.target.value))}
+                className="flex-1 accent-[var(--theme-accent)]"
+              />
+              <span className="w-10 text-right text-xs text-[var(--ink-muted)] tabular-nums">
+                {glassOpacity}%
+              </span>
+            </div>
           </div>
         </div>
       </section>

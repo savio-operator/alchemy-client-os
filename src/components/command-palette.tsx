@@ -34,19 +34,20 @@ export function CommandPalette({ clients, onNewClient }: CommandPaletteProps) {
   return (
     <div className="fixed inset-0 z-50">
       <div
-        className="absolute inset-0 bg-black/20 dark:bg-black/40"
+        className="absolute inset-0 bg-black/20 backdrop-blur-[2px] dark:bg-black/40"
         onClick={() => setOpen(false)}
       />
-      <div className="absolute inset-0 flex items-start justify-center pt-[20vh]">
+      <div className="absolute inset-0 flex items-start justify-center pt-[18vh] px-4">
+        {/* Spotlight-style panel: frosted, floating, origin-centered pop */}
         <Command
-          className="w-full max-w-lg bg-[var(--surface)] rounded-[var(--radius-lg)] shadow-card border border-[var(--rule)] overflow-hidden animate-panel-in"
+          className="w-full max-w-xl material-strong rounded-2xl shadow-elevated border border-[var(--rule)] overflow-hidden animate-sheet-in"
           onKeyDown={(e: React.KeyboardEvent) => {
             if (e.key === "Escape") setOpen(false);
           }}
         >
           <Command.Input
             placeholder="Search clients, jump to section..."
-            className="w-full h-12 px-4 text-sm bg-transparent border-b border-[var(--rule)] outline-none placeholder:text-[var(--ink-muted)]"
+            className="w-full h-13 px-5 text-base bg-transparent border-b border-[var(--rule)] outline-none placeholder:text-[var(--ink-muted)]"
             autoFocus
           />
           <Command.List className="max-h-72 overflow-y-auto p-2">
