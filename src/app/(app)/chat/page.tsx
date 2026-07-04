@@ -1368,6 +1368,9 @@ export default function TeamChatPage() {
     formData.append("file", pendingFile);
     const xhr = new XMLHttpRequest();
     uploadXhrRef.current = xhr;
+    // Without this, a hung connection (bad R2 config, dead network) leaves
+    // the UI stuck on "uploading" indefinitely instead of ever failing.
+    xhr.timeout = 30_000;
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));
@@ -1406,6 +1409,10 @@ export default function TeamChatPage() {
     };
     xhr.onerror = () => {
       alert("Upload failed. Please try again.");
+      finish();
+    };
+    xhr.ontimeout = () => {
+      alert("Upload timed out. Check your connection and try again.");
       finish();
     };
     xhr.onabort = () => {

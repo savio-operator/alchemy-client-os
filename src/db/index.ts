@@ -525,6 +525,38 @@ async function initTables() {
       ON news_items(published_at DESC);
   `);
 
+  // Hot-path indexes. Without these, every one of these queries is a full
+  // table scan on every call — and several of them (chat's 3s SSE poll,
+  // the notification bell's 5-min poll, the assistant watcher's cron) run
+  // continuously for every open session, so an unindexed scan compounds
+  // into app-wide slowness as the tables grow, not just a slow single page.
+  await client.executeMultiple(`
+    CREATE INDEX IF NOT EXISTS idx_chat_messages_channel_created
+      ON chat_messages(channel_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_chat_channel_members_user
+      ON chat_channel_members(user_id);
+    CREATE INDEX IF NOT EXISTS idx_notifications_user_read
+      ON notifications(user_id, is_read);
+    CREATE INDEX IF NOT EXISTS idx_client_discoveries_client
+      ON client_discoveries(client_id);
+    CREATE INDEX IF NOT EXISTS idx_client_discoveries_surfaced
+      ON client_discoveries(surfaced_at);
+    CREATE INDEX IF NOT EXISTS idx_tasks_client
+      ON tasks(client_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_assigned
+      ON tasks(assigned_to);
+    CREATE INDEX IF NOT EXISTS idx_tasks_status
+      ON tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_conversations_client
+      ON conversations(client_id);
+    CREATE INDEX IF NOT EXISTS idx_messages_conversation
+      ON messages(conversation_id);
+    CREATE INDEX IF NOT EXISTS idx_invoices_client
+      ON invoices(client_id);
+    CREATE INDEX IF NOT EXISTS idx_leads_status
+      ON leads(status);
+  `);
+
   // Idempotent ALTER TABLE statements for new columns
   const alters = [
     "ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE CASCADE",

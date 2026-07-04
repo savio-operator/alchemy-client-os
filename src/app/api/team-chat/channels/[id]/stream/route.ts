@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { chatMessages, chatChannelMembers, users } from "@/db/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, inArray } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(
@@ -70,11 +70,20 @@ export async function GET(
             .where(and(eq(chatMessages.channelId, channelId), gt(chatMessages.createdAt, lastSeen)))
             .all();
 
-          for (const msg of newMsgs) {
-            const u = await db.select().from(users).where(eq(users.id, msg.userId)).get();
-            const data = JSON.stringify({ ...msg, userName: u?.name || "Unknown", userRole: u?.role || "member" });
-            if (!safeEnqueue(`data: ${data}\n\n`)) return; // client gone — stop polling
-            if (msg.createdAt > lastSeen) lastSeen = msg.createdAt;
+          if (newMsgs.length > 0) {
+            // One batched lookup for every sender in this poll cycle instead
+            // of a query per message — the loop below re-used the same N+1
+            // shape the 3s poll was hitting the DB with continuously.
+            const userIds = [...new Set(newMsgs.map((m) => m.userId))];
+            const senders = await db.select().from(users).where(inArray(users.id, userIds)).all();
+            const senderById = new Map(senders.map((u) => [u.id, u]));
+
+            for (const msg of newMsgs) {
+              const u = senderById.get(msg.userId);
+              const data = JSON.stringify({ ...msg, userName: u?.name || "Unknown", userRole: u?.role || "member" });
+              if (!safeEnqueue(`data: ${data}\n\n`)) return; // client gone — stop polling
+              if (msg.createdAt > lastSeen) lastSeen = msg.createdAt;
+            }
           }
         } catch {
           // DB error — skip this poll cycle, but keep the loop alive

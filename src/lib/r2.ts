@@ -14,6 +14,11 @@ function getR2Client(): S3Client {
     region: "auto",
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId, secretAccessKey },
+    // Without an explicit timeout the SDK's default can hang far longer than
+    // any user will wait — better to fail fast and let the caller surface a
+    // real error than leave an upload spinning indefinitely.
+    requestHandler: { requestTimeout: 20_000, connectionTimeout: 10_000 },
+    maxAttempts: 2,
   });
 }
 
