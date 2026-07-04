@@ -38,7 +38,7 @@ export default async function CampaignsPage() {
     .map((c) => ({ value: c.id, label: c.name }));
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-3">
           <Megaphone className="w-6 h-6 text-[var(--ink-muted)]" strokeWidth={1.5} />
@@ -118,7 +118,7 @@ export default async function CampaignsPage() {
                   </span>
 
                   <ArrowRight
-                    className="w-4 h-4 text-[var(--ink-muted)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                    className="w-4 h-4 text-[var(--ink-muted)] sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0"
                     strokeWidth={1.5}
                   />
                 </div>

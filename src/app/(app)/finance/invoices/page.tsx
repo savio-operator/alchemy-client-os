@@ -369,7 +369,7 @@ export default function InvoicesPage() {
                     </button>
                   </div>
 
-                  <ArrowRight className="hidden sm:block w-4 h-4 text-[var(--ink-muted)] opacity-0 group-hover:opacity-100 transition-opacity" strokeWidth={1.5} />
+                  <ArrowRight className="hidden sm:block w-4 h-4 text-[var(--ink-muted)] sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" strokeWidth={1.5} />
                 </div>
               </div>
             );

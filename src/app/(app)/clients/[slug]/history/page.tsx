@@ -90,7 +90,7 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-10">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold font-serif">History</h1>
         <Button
@@ -252,7 +252,7 @@ export default function HistoryPage() {
                   </div>
                   <button
                     onClick={() => handleDelete(entry.id)}
-                    className="opacity-0 group-hover:opacity-100 w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)] transition-all duration-120"
+                    className="sm:opacity-0 sm:group-hover:opacity-100 w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)] transition-all duration-120"
                     aria-label="Delete entry"
                   >
                     <Trash2 className="w-3.5 h-3.5 text-[var(--ink-muted)]" strokeWidth={1.5} />

@@ -50,7 +50,7 @@ export default function MarketingPage() {
   const totalBudget = campaigns.reduce((sum, c) => sum + (c.budget || 0), 0);
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-10">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold font-serif">Marketing</h1>
@@ -322,7 +322,7 @@ function CampaignRow({
         </div>
       )}
 
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-120">
+      <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-120">
         {campaign.status === "planned" && (
           <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleStatusChange("active")}>
             Start

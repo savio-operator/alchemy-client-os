@@ -280,7 +280,7 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
           </button>
 
           {showGlass && (
-            <div className="absolute right-0 top-10 w-64 material border border-[var(--rule)] rounded-xl shadow-elevated animate-pop-in z-50 p-4">
+            <div className="absolute right-0 top-10 w-[calc(100vw-2rem)] sm:w-64 material border border-[var(--rule)] rounded-xl shadow-elevated animate-pop-in z-50 p-4">
               <p className="text-sm font-medium mb-0.5">Window transparency</p>
               <p className="text-xs text-[var(--ink-muted)] mb-3">
                 How much of the glass chrome lets content show through
@@ -335,7 +335,7 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
           </button>
 
           {showMenu && (
-            <div className="absolute right-0 top-10 w-56 material border border-[var(--rule)] rounded-xl shadow-elevated animate-pop-in z-50 overflow-hidden">
+            <div className="absolute right-0 top-10 w-[calc(100vw-2rem)] sm:w-56 material border border-[var(--rule)] rounded-xl shadow-elevated animate-pop-in z-50 overflow-hidden">
               <div className="px-3 py-2.5 border-b border-[var(--rule)]">
                 {editingName ? (
                   <div className="flex items-center gap-1.5">
@@ -369,7 +369,7 @@ export function TopBar({ breadcrumbs, userName }: TopBarProps) {
                     <p className="text-sm font-medium truncate">{userName}</p>
                     <button
                       onClick={() => setEditingName(true)}
-                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--muted)] opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--muted)] sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                       title="Edit name"
                     >
                       <Pencil className="w-3 h-3 text-[var(--ink-muted)]" strokeWidth={1.5} />

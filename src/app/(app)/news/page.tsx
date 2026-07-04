@@ -224,7 +224,7 @@ function NewsCard({
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
             aria-label="Open on original site"
-            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--muted)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--muted)] sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0"
           >
             <ExternalLink className="w-4 h-4 text-[var(--ink-muted)]" strokeWidth={1.8} />
           </a>

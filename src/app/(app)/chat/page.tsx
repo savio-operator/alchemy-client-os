@@ -55,6 +55,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/store/user";
 import { useTeamChat, type EnrichedMessage, type EnrichedChannel, type PollData } from "@/store/team-chat";
 import { VoiceClient, type VoiceParticipant } from "@/lib/voice-client";
+import { AttachmentPreviewModal } from "@/components/attachment-preview";
 
 // ─── Avatar helpers ────────────────────────────────────────────────────────────
 
@@ -816,7 +817,11 @@ export default function TeamChatPage() {
   const [input, setInput] = useState("");
   const [editInput, setEditInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingPreviewUrl, setPendingPreviewUrl] = useState<string | null>(null);
+  const [pendingCaption, setPendingCaption] = useState("");
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const uploadXhrRef = useRef<XMLHttpRequest | null>(null);
   const [teamUsers, setTeamUsers] = useState<Array<{ id: string; name: string; role: string }>>([]);
   const [showNewChannel, setShowNewChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
@@ -1333,32 +1338,83 @@ export default function TeamChatPage() {
     setSelectedMessage(null);
   }, [activeChannelId, setReactions, setShowEmojiPicker, setSelectedMessage]);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Stage the picked file for a WhatsApp-style confirm-before-send preview
+  // instead of uploading immediately.
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !activeChannelId) return;
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const uploadRes = await fetch("/api/media/upload", { method: "POST", body: formData });
-      if (uploadRes.ok) {
-        const { url, mediaType } = await uploadRes.json();
-        await fetch(`/api/team-chat/channels/${activeChannelId}/messages`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: file.name, mediaUrl: url, mediaType }),
-        });
-      } else {
-        const err = await uploadRes.json().catch(() => ({ error: "Upload failed" }));
-        alert(err.error || "Upload failed");
-      }
-    } catch {
-      alert("Upload failed. Please try again.");
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (!file) return;
+    setPendingFile(file);
+    setPendingPreviewUrl(URL.createObjectURL(file));
+    setPendingCaption("");
+    setUploadProgress(null);
   };
+
+  const cancelPendingAttachment = useCallback(() => {
+    uploadXhrRef.current?.abort();
+    uploadXhrRef.current = null;
+    if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
+    setPendingFile(null);
+    setPendingPreviewUrl(null);
+    setPendingCaption("");
+    setUploadProgress(null);
+  }, [pendingPreviewUrl]);
+
+  const sendPendingAttachment = useCallback(() => {
+    if (!pendingFile || !activeChannelId) return;
+    setUploadProgress(0);
+
+    const formData = new FormData();
+    formData.append("file", pendingFile);
+    const xhr = new XMLHttpRequest();
+    uploadXhrRef.current = xhr;
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));
+    };
+
+    const finish = () => {
+      uploadXhrRef.current = null;
+      if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
+      setPendingFile(null);
+      setPendingPreviewUrl(null);
+      setPendingCaption("");
+      setUploadProgress(null);
+    };
+
+    xhr.onload = async () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const { url, mediaType } = JSON.parse(xhr.responseText);
+          await fetch(`/api/team-chat/channels/${activeChannelId}/messages`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: pendingCaption.trim(), mediaUrl: url, mediaType }),
+          });
+        } catch {
+          alert("Upload failed. Please try again.");
+        }
+      } else {
+        try {
+          const err = JSON.parse(xhr.responseText);
+          alert(err.error || "Upload failed");
+        } catch {
+          alert("Upload failed. Please try again.");
+        }
+      }
+      finish();
+    };
+    xhr.onerror = () => {
+      alert("Upload failed. Please try again.");
+      finish();
+    };
+    xhr.onabort = () => {
+      uploadXhrRef.current = null;
+    };
+
+    xhr.open("POST", "/api/media/upload");
+    xhr.send(formData);
+  }, [pendingFile, pendingCaption, pendingPreviewUrl, activeChannelId]);
 
   const handleCreateChannel = async () => {
     if (!newChannelName.trim()) return;
@@ -1925,7 +1981,7 @@ export default function TeamChatPage() {
                     {!isGrouped ? (
                       <Avatar userId={msg.userId} name={msg.userName || "?"} size={40} />
                     ) : (
-                      <span className="text-[10px] opacity-0 group-hover:opacity-100 mt-1 select-none text-[var(--ink-muted)]">
+                      <span className="text-[10px] sm:opacity-0 sm:group-hover:opacity-100 mt-1 select-none text-[var(--ink-muted)]">
                         {formatTime(msg.createdAt)}
                       </span>
                     )}
@@ -2203,7 +2259,7 @@ export default function TeamChatPage() {
 
             {/* Main input row */}
             <div className="flex items-end gap-2 px-3 py-2 rounded-b-lg bg-[var(--bg)]">
-              <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip" className="hidden" onChange={handleFileUpload} />
+              <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip" className="hidden" onChange={handleFileSelected} />
 
               {/* + button with popup menu */}
               <div className="relative" ref={plusMenuRef}>
@@ -2318,6 +2374,23 @@ export default function TeamChatPage() {
           </div>
         )}
       </div>
+
+      {pendingFile && pendingPreviewUrl && (
+        <AttachmentPreviewModal
+          file={pendingFile}
+          previewUrl={pendingPreviewUrl}
+          caption={pendingCaption}
+          onCaptionChange={setPendingCaption}
+          onCancel={cancelPendingAttachment}
+          onSend={sendPendingAttachment}
+          uploadProgress={uploadProgress}
+          channelLabel={
+            activeChannel?.type === "group"
+              ? `#${activeChannel?.displayName || activeChannel?.name || ""}`
+              : activeChannel?.displayName || activeChannel?.name || "chat"
+          }
+        />
+      )}
 
       {/* ── Right: Member List — hidden on mobile ── */}
       <AnimatePresence>

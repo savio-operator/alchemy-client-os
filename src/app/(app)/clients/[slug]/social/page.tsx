@@ -120,7 +120,7 @@ export default function SocialPage() {
   const isCurrentMonth = (d: Date) => d.getMonth() === currentDate.getMonth();
 
   return (
-    <div className="px-6 py-10">
+    <div className="px-4 sm:px-6 py-6 sm:py-10">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold font-serif">Social</h1>
         <div className="flex items-center gap-2">
@@ -274,7 +274,7 @@ export default function SocialPage() {
                     )}
                     <button
                       onClick={() => handleDelete(post.id)}
-                      className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)]"
+                      className="sm:opacity-0 sm:group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)]"
                     >
                       <Trash2 className="w-3 h-3 text-[var(--ink-muted)]" strokeWidth={1.5} />
                     </button>

@@ -105,7 +105,7 @@ export default function ClientHomePage() {
 
   if (!client) {
     return (
-      <div className="max-w-4xl mx-auto px-6 py-10 text-center">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10 text-center">
         <p className="text-sm text-[var(--ink-muted)]">Client not found.</p>
       </div>
     );
@@ -114,7 +114,7 @@ export default function ClientHomePage() {
   const timeAgo = getTimeAgo(client.createdAt);
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-10">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       {/* Hero card */}
       <motion.div
         initial={{ opacity: 0, y: 4 }}

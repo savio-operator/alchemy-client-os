@@ -97,7 +97,7 @@ export default function FeedPage() {
   const sourceTypes = [...new Set(items.map((i) => i.discovery.sourceType))];
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-10">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold font-serif">Feed</h1>
@@ -237,7 +237,7 @@ export default function FeedPage() {
                     ))}
                   </div>
 
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-120">
+                  <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-120">
                     {item.discovery.externalUrl && (
                       <button
                         onClick={() => setPreviewItem(item)}

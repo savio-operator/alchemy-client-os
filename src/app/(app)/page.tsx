@@ -288,7 +288,7 @@ export default async function HomePage() {
                   </div>
                 </div>
                 <ArrowRight
-                  className="w-4 h-4 text-[var(--ink-muted)] opacity-0 group-hover:opacity-100 transition-opacity duration-120 shrink-0"
+                  className="w-4 h-4 text-[var(--ink-muted)] sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-120 shrink-0"
                   strokeWidth={1.5}
                 />
               </Link>

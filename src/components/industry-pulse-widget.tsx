@@ -68,7 +68,7 @@ export function IndustryPulseWidget({ items }: { items: NewsItem[] }) {
               </p>
             </div>
             {item.url && (
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <div className="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
                 <ShareToChatButton title={item.title} url={item.url} source={item.source} />
                 <a
                   href={item.url}

@@ -151,7 +151,7 @@ export default function AdvisorPage() {
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }}
-                  className="w-5 h-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 text-red-400 shrink-0 mr-1"
+                  className="w-5 h-5 flex items-center justify-center rounded sm:opacity-0 sm:group-hover:opacity-100 hover:bg-red-50 text-red-400 shrink-0 mr-1"
                 >
                   <Trash2 className="w-3 h-3" strokeWidth={1.5} />
                 </button>

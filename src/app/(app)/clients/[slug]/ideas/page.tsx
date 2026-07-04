@@ -113,7 +113,7 @@ export default function IdeasPage() {
   }
 
   return (
-    <div className="px-6 py-10">
+    <div className="px-4 sm:px-6 py-6 sm:py-10">
       <h1 className="text-2xl font-semibold font-serif mb-6">Ideas</h1>
 
       <DndContext
@@ -121,7 +121,7 @@ export default function IdeasPage() {
         collisionDetection={closestCenter}
         onDragEnd={handleDragEnd}
       >
-        <div className="grid grid-cols-3 gap-4 min-h-[60vh]">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 min-h-[60vh]">
           {COLUMNS.map((col) => {
             const columnIdeas = getColumnIdeas(col.id);
             return (
@@ -248,7 +248,7 @@ function IdeaCard({
         <button
           {...attributes}
           {...listeners}
-          className="mt-0.5 w-5 h-5 flex items-center justify-center shrink-0 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity duration-120"
+          className="mt-0.5 w-5 h-5 flex items-center justify-center shrink-0 cursor-grab sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-120"
         >
           <GripVertical className="w-3.5 h-3.5 text-[var(--ink-muted)]" strokeWidth={1.5} />
         </button>
@@ -290,7 +290,7 @@ function IdeaCard({
           </div>
         </div>
 
-        <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-120">
+        <div className="flex flex-col gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-120">
           <button
             className="w-6 h-6 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)] transition-colors duration-120"
             title="Refine with agent (Phase 2)"

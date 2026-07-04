@@ -277,7 +277,7 @@ export function AgentDrawer() {
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: 400, opacity: 0 }}
           transition={{ duration: 0.22, ease: [0.25, 0.1, 0.25, 1] }}
-          className="w-[400px] h-full border-l border-[var(--rule)] bg-[var(--surface)] flex flex-col shrink-0"
+          className="fixed inset-y-0 right-0 z-50 w-full sm:w-[400px] border-l border-[var(--rule)] bg-[var(--surface)] flex flex-col shrink-0"
         >
           {/* Header */}
           <div className="h-14 flex items-center justify-between px-4 border-b border-[var(--rule)]">
@@ -464,7 +464,7 @@ export function AgentDrawer() {
                         })}
                       </p>
                     </div>
-                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
+                    <div className="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100">
                       {editingId === c.id ? (
                         <button
                           onClick={(e) => {

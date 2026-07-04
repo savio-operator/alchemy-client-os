@@ -82,7 +82,7 @@ export function ShareToChatButton({
         title="Share to chat"
         className={
           className ??
-          "w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--muted)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+          "w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--muted)] sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0"
         }
       >
         <Share2 className="w-4 h-4 text-[var(--ink-muted)]" strokeWidth={1.8} />

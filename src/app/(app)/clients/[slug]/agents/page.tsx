@@ -74,7 +74,7 @@ export default function AgentsPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-10">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold font-serif">Agents</h1>
         <Button
@@ -176,7 +176,7 @@ export default function AgentsPage() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-120">
+                <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-120">
                   <button
                     onClick={() => setViewingAgent(viewingAgent?.name === agent.name ? null : agent)}
                     className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--muted)]"

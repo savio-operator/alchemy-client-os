@@ -261,7 +261,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-10">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       <h1 className="text-2xl font-semibold font-serif mb-6">Settings</h1>
 
       {/* Appearance */}
